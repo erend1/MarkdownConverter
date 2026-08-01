@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>MarkdownConverter</AssemblyName>
     <RootNamespace>MarkdownConverter.Desktop</RootNamespace>
@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,7 +35,7 @@
   <Target Name="CopyBlazorOutput" AfterTargets="Build">
     <PropertyGroup>
       <BlazorStaticPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\wwwroot\</BlazorStaticPath>
-      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net8.0\wwwroot\</BlazorBuildPath>
+      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net10.0\wwwroot\</BlazorBuildPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -59,7 +59,7 @@
   <Target Name="CopyBlazorPublish" AfterTargets="Publish">
     <PropertyGroup>
       <BlazorStaticPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\wwwroot\</BlazorStaticPath>
-      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net8.0\wwwroot\</BlazorBuildPath>
+      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net10.0\wwwroot\</BlazorBuildPath>
     </PropertyGroup>
 
     <ItemGroup>
