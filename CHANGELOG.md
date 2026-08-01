@@ -6,4 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- Updated the .NET 8 WebAssembly and test dependencies to remove known vulnerable transitive packages.
+
 The first published version will receive a dated section when its release candidate is approved.
