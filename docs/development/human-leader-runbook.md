@@ -11,7 +11,9 @@ Human chooses the outcome and priority
   -> Worker uses one worktree, branch, issue, and draft PR
   -> CI proves the exact commit
   -> Planner/reviewer checks the issue contract
-  -> Human approves merge and later release
+  -> Human approves merge
+  -> Human/Worker verifies post-merge gates and cleans task resources
+  -> Human separately authorizes any release
 ```
 
 The human leader does not need to repeatedly explain the architecture or summarize earlier work. Give the agent a role, an issue number, and the correct worktree. `AGENTS.md`, the GitHub issue, the generated context, and the current diff supply the rest.
@@ -176,7 +178,8 @@ Run the refresher at these events—not on a timer:
 - main-branch movement that affects the task;
 - review feedback;
 - before marking a PR ready;
-- before final merge verification.
+- before final merge verification;
+- after merge, when checking exact-main gates and closing the task.
 
 ## Reading refresher output
 
@@ -186,7 +189,7 @@ Run the refresher at these events—not on a timer:
 | `NEEDS_ISSUE_BRANCH` | Create the dedicated worktree/branch |
 | `NEEDS_DRAFT_PR` | Reach the first coherent commit, then create the authorized draft PR |
 | `BLOCKED` | Do not implement; resolve or wait for dependencies |
-| `ISSUE_NOT_OPEN` | Stop and confirm whether a new/reopened issue is required |
+| `ISSUE_NOT_OPEN` | Before implementation, stop and confirm whether a new/reopened issue is required. During Step 10, accept it only after confirming the issue closed through the intended merged PR |
 | `BRANCH_TASK_MISMATCH` | Move the agent to the correct worktree |
 | `DIRTY_DEFAULT_BRANCH` | Preserve the changes and move them off `main` |
 | `LOCAL_REMOTE_STALE` | Fetch and safely integrate current main before continuing |
@@ -252,7 +255,7 @@ Before approving merge, confirm:
 
 - the issue is still open and dependencies remain satisfied;
 - the PR closes the intended issue;
-- acceptance evidence is complete;
+- pre-merge acceptance evidence is complete and any post-merge gates are explicit;
 - current full Release tests pass;
 - required browser/Desktop/manual evidence is recorded;
 - required CI checks are green for the reviewed commit;
@@ -262,6 +265,83 @@ Before approving merge, confirm:
 - no unapproved dependency, license, release, or repository-setting change exists.
 
 The human then approves merge. Code issues should close through `Closes #<number>` when the PR merges rather than through a separate early manual close.
+
+## Step 10: verify post-merge gates and close the task
+
+Merge approval is not the last checkpoint when an issue requires deployment, publication, migration, or other evidence that can exist only after merge. Perform closure from the clean integration checkout and tie evidence to the resulting exact `main` commit—not to the feature head, a previous verification record, or a deployment from another SHA.
+
+1. Refresh the integration checkout and identify the merge commit from the PR:
+
+   ```powershell
+   git switch main
+   git status --short --branch
+   git fetch origin
+   git pull --ff-only
+
+   $prNumber = 123
+   $issueNumber = 123
+   $mergeSha = gh pr view $prNumber --json mergeCommit --jq '.mergeCommit.oid'
+   git merge-base --is-ancestor $mergeSha origin/main
+   ```
+
+   Stop if `main` is dirty, the pull is not a fast-forward, the PR has no merge commit, or the merge commit is not contained in current `origin/main`.
+
+2. Confirm that the intended PR merged and the issue closed through that PR:
+
+   ```powershell
+   gh pr view $prNumber --json state,mergedAt,mergeCommit,url
+   gh issue view $issueNumber --json state,closedAt,closedByPullRequestsReferences,url
+   ```
+
+   `ISSUE_NOT_OPEN` is expected at this stage only when this relationship is confirmed. If the issue did not close as intended, investigate the merge/closing reference; do not close it manually without a human decision.
+
+3. Verify exact-commit remote and manual gates required by the issue:
+
+   ```powershell
+   gh run list --commit $mergeSha --json databaseId,workflowName,status,conclusion,headSha,url
+   gh api "repos/{owner}/{repo}/deployments?sha=$mergeSha&per_page=100"
+   ```
+
+   GitHub CLI fills `{owner}` and `{repo}` from the current checkout. Confirm required jobs and deployments succeeded for `$mergeSha`, then perform any issue-specific live URL, browser, Desktop, migration, or artifact checks. A tree-equivalent feature SHA does not replace exact-commit evidence when the issue requires the resulting `main` commit.
+
+   If a required post-merge gate fails, stop cleanup, record the failure in the PR handoff, and ask the human to choose rollback, issue reopening, or a bounded follow-up.
+
+4. Replace the merged PR's handoff with the final durable snapshot. Record the reviewed head SHA, resulting `main` SHA, exact-commit CI/deployment links, required manual evidence, issue closure, and any separately authorized release action. Set the next action to task-resource cleanup, or to the exact unresolved gate when closure is incomplete.
+
+5. Remove task resources only after the final evidence is durable and a human authorizes destructive cleanup. Resolve the exact worktree/branch, confirm the task worktree has no tracked or untracked changes that must be preserved, and inspect the remote branch before removal:
+
+   ```powershell
+   $issueSlug = "short-description"
+   $branch = "issue/$issueNumber-$issueSlug"
+   $issueWorktree = "..\MarkdownConverter-issue-$issueNumber"
+
+   git worktree list --porcelain
+   git -C $issueWorktree status --porcelain=v1 --untracked-files=all
+   git ls-remote --heads origin "refs/heads/$branch"
+   ```
+
+   After those checks and authorization:
+
+   ```powershell
+   git worktree remove $issueWorktree
+   git branch -d $branch
+   git push origin --delete $branch
+   git fetch --prune origin
+   git worktree prune
+   ```
+
+   Run the remote deletion only when the remote branch still exists. Worktree removal also discards ignored `.agent/`, `bin/`, `obj/`, and other disposable outputs, so move any required evidence into the PR before cleanup.
+
+   A squash or rebase merge can make safe `git branch -d` refuse even when the merged tree is identical. Do not immediately force deletion. First confirm the PR is merged and compare the exact trees:
+
+   ```powershell
+   git rev-parse "${branch}^{tree}"
+   git rev-parse "${mergeSha}^{tree}"
+   ```
+
+   A human may authorize `git branch -D $branch` only when the intended commits are durably represented by the merged PR and the tree comparison or reviewed diff explains the non-ancestry.
+
+6. Treat releases, tags, repository settings, and other publication operations as a separate workflow. A merged and cleaned-up issue does not authorize them; follow `.github/RELEASING.md` only after an explicit human decision.
 
 ## Parallel work limits
 
