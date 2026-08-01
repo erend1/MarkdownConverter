@@ -37,7 +37,7 @@ The workflow files and refresher must exist on the default branch before new wor
 Required local tools:
 
 - Git;
-- .NET 8 SDK;
+- .NET 10 SDK;
 - PowerShell 7 or Windows PowerShell 5.1;
 - GitHub CLI (`gh`) authenticated for online issue, PR, and Actions state.
 

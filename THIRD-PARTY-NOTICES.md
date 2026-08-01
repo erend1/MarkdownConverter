@@ -6,7 +6,7 @@ This notice is included in source distributions, GitHub Pages artifacts, and Des
 
 ## .NET, ASP.NET Core, Microsoft.Extensions, and Open XML SDK
 
-Components include the .NET 8 runtime and framework libraries, ASP.NET Core Blazor WebAssembly 8.0.29, Microsoft.Extensions packages, System libraries, and DocumentFormat.OpenXml 3.2.0. These components are distributed under the MIT License.
+Components include the .NET 10 runtime and framework libraries, ASP.NET Core Blazor WebAssembly 10.0.10, Microsoft.Extensions 10.0.10 packages, System libraries, and DocumentFormat.OpenXml 3.2.0. These components are distributed under the MIT License.
 
 Copyright (c) .NET Foundation and Contributors
 

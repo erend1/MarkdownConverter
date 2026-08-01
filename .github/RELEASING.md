@@ -2,6 +2,8 @@
 
 Desktop releases are tag-driven. The standalone WebApp is deployed to GitHub Pages from verified `main` commits, and the Desktop host also copies the WebApp's `wwwroot` output into its own publish folder.
 
+Both delivery workflows use the .NET 10 SDK and install the `wasm-tools` workload before restore. Use the same SDK and workload for local release verification.
+
 ## Channels
 
 | Channel | Tag pattern | GitHub Release type | Use for |
