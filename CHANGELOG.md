@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the CI and release workflows to GitHub Actions versions that run on Node.js 24.
+
 ### Security
 
 - Updated the .NET 8 WebAssembly and test dependencies to remove known vulnerable transitive packages.
