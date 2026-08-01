@@ -1,0 +1,23 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+
+@if (AsLabel)
+{
+    <label class="@ComposedCssClass" title="@Title">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <i class="icon icon-sm lucide-@Icon"></i>
+        }
+        @ChildContent
+    </label>
+}
+else
+{
+    <button type="button" class="@ComposedCssClass" @onclick="OnClick"
+            disabled="@Disabled" title="@Title">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <i class="icon icon-sm lucide-@Icon"></i>
+        }
+        @ChildContent
+    </button>
+}

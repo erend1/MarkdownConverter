@@ -1,0 +1,12 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+@typeparam TItem
+
+<select class="@CssClass" @onchange="OnChanged">
+    @foreach (var item in Items)
+    {
+        <option value="@ValueBinder(item)"
+                selected="@(EqualityComparer<TItem>.Default.Equals(item, Selected))">
+            @DisplayBinder(item)
+        </option>
+    }
+</select>

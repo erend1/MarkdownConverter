@@ -1,0 +1,11 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+
+<input type="text"
+       class="@CssClass"
+       value="@Value"
+       @oninput="OnInput"
+       @onkeydown="OnKeyDown"
+       @onblur="OnBlur"
+       @onclick:stopPropagation="StopClickPropagation"
+       placeholder="@Placeholder"
+       autofocus="@AutoFocus" />

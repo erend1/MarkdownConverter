@@ -1,0 +1,10 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+
+<div class="toolbar-actions">
+    @ChildContent
+</div>
+
+@code {
+    [Microsoft.AspNetCore.Components.Parameter]
+    public Microsoft.AspNetCore.Components.RenderFragment? ChildContent { get; set; }
+}

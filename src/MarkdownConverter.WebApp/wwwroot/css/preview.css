@@ -1,0 +1,105 @@
+/* GitHub-flavored Markdown preview styling */
+.markdown-body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    color: var(--text-primary);
+}
+
+.markdown-body h1 { font-size: 2em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; margin: 24px 0 16px; }
+.markdown-body h2 { font-size: 1.5em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; margin: 24px 0 16px; }
+.markdown-body h3 { font-size: 1.25em; margin: 24px 0 16px; }
+.markdown-body h4 { font-size: 1em; margin: 24px 0 16px; }
+.markdown-body h5 { font-size: 0.875em; margin: 24px 0 16px; }
+
+.markdown-body p { margin: 0 0 16px; }
+
+.markdown-body code {
+    font-family: var(--font-mono);
+    font-size: 85%;
+    padding: 0.2em 0.4em;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.markdown-body pre {
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 16px;
+}
+
+.markdown-body pre code {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+
+.markdown-body blockquote {
+    padding: 0 1em;
+    border-left: 3px solid var(--border-color);
+    color: var(--text-secondary);
+    margin: 0 0 16px;
+}
+
+.markdown-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.markdown-body th, .markdown-body td {
+    padding: 6px 13px;
+    border: 1px solid var(--border-color);
+}
+
+.markdown-body th {
+    font-weight: 600;
+    background: var(--bg-secondary);
+}
+
+.markdown-body hr {
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    margin: 24px 0;
+}
+
+.markdown-body ul, .markdown-body ol {
+    padding-left: 2em;
+    margin-bottom: 16px;
+}
+
+.markdown-body li + li {
+    margin-top: 0.25em;
+}
+
+.markdown-body img {
+    max-width: 100%;
+    height: auto;
+}
+
+.markdown-body a {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+/* Display math centering — $$...$$ should be centered, not left-aligned */
+.markdown-body div.math,
+.markdown-body .math-display {
+    text-align: center;
+    margin: 1em 0;
+}
+
+/* Inline math — no extra margin */
+.markdown-body span.math {
+    display: inline;
+}

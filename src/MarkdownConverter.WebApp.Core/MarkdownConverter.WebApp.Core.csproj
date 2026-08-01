@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\MarkdownConverter.Core\MarkdownConverter.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MarkdownConverter.WebApp.Core.Tests" />
+  </ItemGroup>
+</Project>

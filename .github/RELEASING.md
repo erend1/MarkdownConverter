@@ -1,0 +1,69 @@
+# Releasing MarkdownConverter Desktop
+
+Releases are tag-driven and Desktop-only. The WebApp is published only because the Desktop host copies its `wwwroot` output into the desktop publish folder.
+
+## Channels
+
+| Channel | Tag pattern | GitHub Release type | Use for |
+|---------|-------------|---------------------|---------|
+| Alpha | `v0.1.0-alpha.1` | Prerelease | Earliest validation builds |
+| Beta | `v0.1.0-beta.1` | Prerelease | Feature-complete validation |
+| Preview / RC | `v0.1.0-rc.1` | Prerelease | Release-candidate validation |
+| Stable | `v0.1.0` | Release | General use |
+
+## Steps
+
+1. Decide the target channel and version.
+2. Add a `CHANGELOG.md` entry under `## [<version>] - <date>`.
+3. Commit the changelog and any release-prep changes to `main`.
+4. Push `main`.
+5. Create and push the tag:
+
+   ```bash
+   git tag v<version>
+   git push origin v<version>
+   ```
+
+6. Watch the `release` workflow under GitHub Actions.
+7. Verify the GitHub Release has:
+   - `MarkdownConverter-<version>-win-x64.zip`
+   - `MarkdownConverter-<version>-win-x64.zip.sha256`
+   - release notes copied from the matching changelog section
+8. Download the zip on a clean Windows 10/11 machine with WebView2 Runtime installed and smoke-test:
+   - app opens
+   - new tab works
+   - Markdown preview updates
+   - save/open file works
+
+## If Release Fails
+
+If the workflow fails before creating a release, diagnose the failure on `main`. A tag that has never produced a public release may be deleted and recreated only with explicit maintainer approval:
+
+```bash
+git tag -d v<version>
+git tag v<version>
+git push origin :refs/tags/v<version>
+git push origin v<version>
+```
+
+Never move or reuse a tag after its release has been published. Correct the problem and publish a new version instead. A partial release may be removed only through an explicit maintainer recovery decision.
+
+## Required Repository Settings
+
+These settings are not represented in source files and must be configured in GitHub:
+
+1. Protect `main`.
+2. Require the `build-test` status check from `.github/workflows/ci.yml` before merging.
+3. Add a ruleset for tags matching `v*`.
+4. Restrict `v*` tag creation/update/deletion to the repository owner or maintainer role.
+5. Document the selected ruleset name and bypass roles in the PR description.
+
+## Out of Scope
+
+- Auto-update layers such as Velopack or Squirrel
+- Code signing
+- Installers such as MSIX, WiX, or Inno Setup
+- Cross-platform builds
+- WebApp deployment
+- NuGet package publishing
+- Nightly or scheduled builds

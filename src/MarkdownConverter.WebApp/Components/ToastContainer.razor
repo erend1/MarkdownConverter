@@ -1,0 +1,21 @@
+@implements IDisposable
+
+<div class="toast-container">
+    @foreach (var toast in _toasts)
+    {
+        <div class="toast toast-@toast.Message.Type toast-@(toast.Fading ? "fade-out" : "fade-in")">
+            <span class="toast-text">@toast.Message.Text</span>
+            <div class="toast-actions">
+                @if (!string.IsNullOrEmpty(toast.Message.Details))
+                {
+                    <button class="toast-action" @onclick="() => OnShowDetails(toast)"
+                            type="button" title="Show full error details">
+                        Show details
+                    </button>
+                }
+                <button class="toast-close" @onclick="() => DismissNow(toast)"
+                        type="button" aria-label="Close" title="Close">&times;</button>
+            </div>
+        </div>
+    }
+</div>

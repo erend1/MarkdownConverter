@@ -1,0 +1,14 @@
+@implements MarkdownConverter.WebApp.Core.Views.IPreviewView
+
+<div class="preview-container">
+    <div class="preview-header">
+        <span>Preview</span>
+        @if (Presenter.ViewModel.IsRendering)
+        {
+            <span class="preview-loading">rendering...</span>
+        }
+    </div>
+    <div id="preview-content" class="preview-content markdown-body">
+        @((MarkupString)Presenter.ViewModel.HtmlContent)
+    </div>
+</div>

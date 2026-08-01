@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+<div class="app-container @(_isDark ? "dark" : "light")">
+    <header class="app-toolbar">
+        <div class="toolbar-left">
+            <span class="app-logo">MD Converter</span>
+        </div>
+        <div class="toolbar-center">
+            <Toolbar />
+        </div>
+        <div class="toolbar-right">
+            <ThemeToggle IsDark="@_isDark" OnToggle="@ToggleTheme" />
+        </div>
+    </header>
+    <main class="app-main">
+        @Body
+    </main>
+    <ToastContainer />
+    <ErrorDetailsDialog />
+</div>

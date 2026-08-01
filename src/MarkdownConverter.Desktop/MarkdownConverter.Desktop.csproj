@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>MarkdownConverter</AssemblyName>
+    <RootNamespace>MarkdownConverter.Desktop</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="app.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MarkdownConverter.Core\MarkdownConverter.Core.csproj" />
+    <ProjectReference Include="..\MarkdownConverter.Infrastructure\MarkdownConverter.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Reference WebApp so it builds first (ensures wwwroot output exists) -->
+  <ItemGroup>
+    <ProjectReference Include="..\MarkdownConverter.WebApp\MarkdownConverter.WebApp.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Copy Blazor WASM files into output wwwroot at build time -->
+  <Target Name="CopyBlazorOutput" AfterTargets="Build">
+    <PropertyGroup>
+      <BlazorStaticPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\wwwroot\</BlazorStaticPath>
+      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net8.0\wwwroot\</BlazorBuildPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BlazorStaticFiles Include="$(BlazorStaticPath)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlazorStaticFiles)"
+          DestinationFiles="@(BlazorStaticFiles->'$(OutputPath)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(BlazorStaticPath)')" />
+
+    <ItemGroup>
+      <BlazorBuildFiles Include="$(BlazorBuildPath)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlazorBuildFiles)"
+          DestinationFiles="@(BlazorBuildFiles->'$(OutputPath)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(BlazorBuildPath)')" />
+  </Target>
+
+  <!-- Also copy wwwroot on Publish -->
+  <Target Name="CopyBlazorPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <BlazorStaticPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\wwwroot\</BlazorStaticPath>
+      <BlazorBuildPath>$(MSBuildThisFileDirectory)..\MarkdownConverter.WebApp\bin\$(Configuration)\net8.0\wwwroot\</BlazorBuildPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <BlazorStaticFilesPublish Include="$(BlazorStaticPath)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlazorStaticFilesPublish)"
+          DestinationFiles="@(BlazorStaticFilesPublish->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(BlazorStaticPath)')" />
+
+    <ItemGroup>
+      <BlazorBuildFilesPublish Include="$(BlazorBuildPath)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlazorBuildFilesPublish)"
+          DestinationFiles="@(BlazorBuildFilesPublish->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(BlazorBuildPath)')" />
+  </Target>
+
+</Project>

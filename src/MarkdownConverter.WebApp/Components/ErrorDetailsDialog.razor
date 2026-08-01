@@ -1,0 +1,20 @@
+@implements IDisposable
+
+@if (_current is not null)
+{
+    <div class="dialog-backdrop" @onclick="Close">
+        <div class="dialog" @onclick:stopPropagation="true" @onkeydown="OnKeyDown" tabindex="-1">
+            <div class="dialog-header">
+                <span class="dialog-title">@_current.Title</span>
+                <button class="dialog-close" @onclick="Close" type="button"
+                        aria-label="Close" title="Close">&times;</button>
+            </div>
+            <pre class="dialog-body">@_current.Details</pre>
+            <div class="dialog-footer">
+                <span class="dialog-copy-status">@_copyStatus</span>
+                <button class="btn btn-sm" @onclick="Copy" type="button">Copy</button>
+                <button class="btn btn-sm" @onclick="Close" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,13 @@
+@page "/"
+@implements IDisposable
+
+<div class="editor-layout">
+    <div class="editor-pane" id="editor-pane" style="@LeftPaneStyle">
+        <TabBar />
+        <MarkdownEditor />
+    </div>
+    <div class="splitter" id="splitter" @onmousedown="OnSplitterMouseDown"></div>
+    <div class="preview-pane" id="preview-pane" style="@RightPaneStyle">
+        <HtmlPreview />
+    </div>
+</div>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Document background -->
+  <rect x="64" y="32" width="384" height="448" rx="32" fill="#0969da"/>
+  <!-- Dog-ear fold -->
+  <path d="M336 32 L448 144 L336 144 Z" fill="#79c0ff"/>
+  <!-- Markdown # symbol -->
+  <text x="144" y="272" font-family="Consolas,'Courier New',monospace" font-size="176" font-weight="bold" fill="white">#</text>
+  <!-- Convert arrow -->
+  <path d="M272 224 L368 224 L368 192 L432 248 L368 304 L368 272 L272 272 Z" fill="white" opacity="0.9"/>
+  <!-- Format dots -->
+  <circle cx="160" cy="384" r="24" fill="#79c0ff"/>
+  <circle cx="256" cy="384" r="24" fill="#79c0ff"/>
+  <circle cx="352" cy="384" r="24" fill="#79c0ff"/>
+</svg>

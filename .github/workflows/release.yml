@@ -1,0 +1,100 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse tag
+        id: parse
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$') {
+            throw "Tag '$tag' is not a supported release tag. Use vX.Y.Z, vX.Y.Z-alpha.N, vX.Y.Z-beta.N, or vX.Y.Z-rc.N."
+          }
+
+          $version = $tag -replace '^v',''
+          $isPrerelease = $version -match '-(alpha|beta|rc)\.'
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "prerelease=$isPrerelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.parse.outputs.version }}
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: Publish WebApp
+        run: dotnet publish src/MarkdownConverter.WebApp/MarkdownConverter.WebApp.csproj --configuration Release /p:Version=${{ steps.parse.outputs.version }}
+
+      - name: Publish Desktop
+        run: dotnet publish src/MarkdownConverter.Desktop/MarkdownConverter.Desktop.csproj --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:Version=${{ steps.parse.outputs.version }} --output publish/desktop
+
+      - name: Zip artifact
+        shell: pwsh
+        run: |
+          $zipName = "MarkdownConverter-${{ steps.parse.outputs.version }}-win-x64.zip"
+          Compress-Archive -Path publish/desktop/* -DestinationPath $zipName -Force
+          "zip=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Compute SHA256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash $env:zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $env:zip" | Out-File -FilePath "$env:zip.sha256" -Encoding ascii
+
+      - name: Extract CHANGELOG section
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.parse.outputs.version }}"
+          $lines = Get-Content CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^## \[$([regex]::Escape($ver))\]" | Select-Object -First 1).LineNumber
+
+          if (-not $start) {
+            "## $ver`n`n_See commit history - no curated changelog entry for this version._" | Out-File release_notes.md -Encoding utf8
+            return
+          }
+
+          $tail = $lines[$start..($lines.Length - 1)]
+          $next = ($tail[1..($tail.Length - 1)] | Select-String -Pattern '^## \[' | Select-Object -First 1).LineNumber
+          $end = if ($next) { $start + $next - 2 } else { $lines.Length - 1 }
+          $lines[($start - 1)..$end] | Out-File release_notes.md -Encoding utf8
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ghArgs = @(
+            "release", "create", "${{ steps.parse.outputs.tag }}",
+            $env:zip, "$env:zip.sha256",
+            "--title", "${{ steps.parse.outputs.tag }}",
+            "--notes-file", "release_notes.md"
+          )
+
+          if ("${{ steps.parse.outputs.prerelease }}" -eq "True") {
+            $ghArgs += "--prerelease"
+          }
+
+          gh @ghArgs

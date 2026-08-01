@@ -1,0 +1,114 @@
+name: Architecture correction
+description: Correct a demonstrated ownership, dependency, lifecycle, or testability defect.
+title: "[Architecture]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Architecture work requires a concrete defect or delivery constraint. File size, preference, and theoretical reuse are not sufficient evidence.
+
+  - type: input
+    id: verified_revision
+    attributes:
+      label: Investigated revision
+      placeholder: main@0123456789abcdef
+    validations:
+      required: true
+
+  - type: textarea
+    id: defect
+    attributes:
+      label: Demonstrated architectural defect
+      description: Show the dependency, duplicated state, race, lifecycle leak, inability to test, or repeated delivery cost.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_boundary
+    attributes:
+      label: Current ownership and boundary
+      description: Identify the current source of truth, callers, dependencies, and affected runtime paths.
+    validations:
+      required: true
+
+  - type: textarea
+    id: required_boundary
+    attributes:
+      label: Required ownership and preserved behavior
+      description: State where responsibility must live and which contracts/user behaviors cannot change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: Summarize viable alternatives, trade-offs, and why the preferred direction is the smallest correct one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependency graph and integration order
+      description: List blocked-by/unblocks relationships, parallel-safe work, and shared-file collision risks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Compatibility and migration
+      description: Cover public/persisted contracts, temporary adapters, rollout ordering, rollback, and cleanup boundaries. Write "No migration" when applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        AC1. ...
+        AC2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Verification strategy
+      description: Identify unit, composition, browser/integration, performance, lifecycle, cancellation, and manual evidence required.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals and prohibited shortcuts
+      description: Explicitly prevent adjacent redesign, speculative abstractions, weakened tests, and unrelated cleanup.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options:
+        - Medium - bounded ownership correction
+        - High - cross-cutting, persisted/public contract, security, or release impact
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: ready_check
+    attributes:
+      label: Readiness check
+      options:
+        - label: The problem cannot be solved correctly by a smaller behavioral change at the current seam.
+          required: true
+        - label: Mandatory constraints are separated from suggested class and method designs.
+          required: true
+        - label: Integration ordering and regression evidence are explicit.
+          required: true

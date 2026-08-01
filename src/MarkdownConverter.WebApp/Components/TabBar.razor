@@ -1,0 +1,33 @@
+@implements MarkdownConverter.WebApp.Core.Views.ITabView
+
+<div class="tab-bar">
+    <div class="tab-list">
+        @for (int i = 0; i < TabPresenter.Tabs.Count; i++)
+        {
+            var idx = i;
+            var tab = TabPresenter.Tabs[i];
+            <AppTab Tab="tab"
+                    IsActive="idx == TabPresenter.ActiveIndex"
+                    IsDragOver="_dragOverIndex == idx"
+                    IsRenaming="_renamingIndex == idx"
+                    RenameText="_renameText"
+                    RenameTextChanged="@(v => _renameText = v)"
+                    OnClick="@(() => SwitchToAsync(idx))"
+                    OnDragStart="@(() => OnDragStart(idx))"
+                    OnDragOver="@(() => OnDragOver(idx))"
+                    OnDragLeave="OnDragLeave"
+                    OnDragEnd="OnDragEnd"
+                    OnDrop="@(() => OnDrop(idx))"
+                    OnStartRename="@(() => StartRename(idx))"
+                    OnRenameBlur="@(() => FinishRename(idx))"
+                    OnRenameKeyDown="@(e => OnRenameKeyDown(e, idx))"
+                    OnClose="@(() => CloseTabAsync(idx))" />
+        }
+    </div>
+    @if (TabPresenter.CanAddTab)
+    {
+        <AppIconButton IconClass="tab-new"
+                       OnClick="NewTabAsync"
+                       Title="New tab (Ctrl+N)">+</AppIconButton>
+    }
+</div>

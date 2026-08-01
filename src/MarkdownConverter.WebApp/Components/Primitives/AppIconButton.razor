@@ -1,0 +1,15 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+
+<button type="button" class="@IconClass"
+        @onclick="OnClick"
+        @onclick:stopPropagation="StopPropagation"
+        title="@Title">
+    @if (!string.IsNullOrEmpty(LucideIcon))
+    {
+        <i class="icon icon-sm lucide-@LucideIcon"></i>
+    }
+    else
+    {
+        @ChildContent
+    }
+</button>

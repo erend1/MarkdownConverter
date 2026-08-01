@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <!--
+    Compile-link PortStore.cs directly so this test project can stay on
+    plain net8.0 and avoid pulling in Windows-Forms / WebView2 dependencies
+    from the Desktop project.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\src\MarkdownConverter.Desktop\LaunchRequest.cs" Link="LaunchRequest.cs" />
+    <Compile Include="..\..\src\MarkdownConverter.Desktop\PortStore.cs" Link="PortStore.cs" />
+    <Compile Include="..\..\src\MarkdownConverter.Desktop\SingleInstanceCoordinator.cs" Link="SingleInstanceCoordinator.cs" />
+    <Compile Include="..\..\src\MarkdownConverter.Desktop\StartupArgs.cs" Link="StartupArgs.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

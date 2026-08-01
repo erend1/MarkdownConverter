@@ -1,0 +1,40 @@
+@implements MarkdownConverter.WebApp.Core.Views.IExportView
+@using MarkdownConverter.WebApp.Core.Models
+
+<div class="export-panel">
+    <AppSelect TItem="ExportOption"
+               Items="ExportPresenter.ViewModel.AvailableFormats"
+               Selected="ExportPresenter.ViewModel.SelectedFormat"
+               ValueBinder="@(f => f.Format.ToString())"
+               DisplayBinder="@(f => f.DisplayName)"
+               SelectionChanged="OnFormatSelected" />
+
+    <AppButton Variant="ButtonVariant.Export"
+               OnClick="OnExport"
+               Disabled="ExportPresenter.ViewModel.IsExporting">
+        @if (ExportPresenter.ViewModel.IsExporting)
+        {
+            <span>Exporting...</span>
+        }
+        else
+        {
+            <span>Export</span>
+        }
+    </AppButton>
+
+    <AppButton Variant="ButtonVariant.Pdf"
+               OnClick="OnPrintPdf"
+               Title="Open print dialog to save as PDF">
+        Print PDF
+    </AppButton>
+
+    @if (_isDesktop)
+    {
+        <AppButton Variant="ButtonVariant.CompilePdf"
+                   OnClick="OnCompilePdf"
+                   Disabled="_isCompiling"
+                   Title="Compile to PDF via pdflatex (Desktop only)">
+            @(_isCompiling ? "Compiling..." : "Compile PDF")
+        </AppButton>
+    }
+</div>

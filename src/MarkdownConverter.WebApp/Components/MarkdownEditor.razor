@@ -1,0 +1,38 @@
+@implements MarkdownConverter.WebApp.Core.Views.IEditorView
+
+<div class="editor-container">
+    <div class="editor-header">
+        <span class="editor-filename">@TabPresenter.ActiveTab.FileName</span>
+        @if (TabPresenter.ActiveTab.IsDirty)
+        {
+            <span class="editor-dirty" title="Unsaved changes">*</span>
+        }
+        <span class="editor-stats">
+            Ln @TabPresenter.ActiveTab.LineCount
+            &middot; @TabPresenter.ActiveTab.WordCount words
+            &middot; @TabPresenter.ActiveTab.CharCount chars
+        </span>
+    </div>
+
+    @if (_showFind)
+    {
+        <AppFindBar @ref="_findBar"
+                    ShowReplace="_showReplace"
+                    ShowReplaceChanged="OnShowReplaceChanged"
+                    OnClose="OnFindBarClosed"
+                    OnAfterFindChanged="RenderHighlightsAsync" />
+    }
+
+    <div class="editor-mirror-wrap">
+        <div class="editor-mirror" aria-hidden="true"></div>
+        <textarea @key="TabPresenter.ActiveTab.Id"
+                  class="editor-textarea"
+                  @oninput="OnInput"
+                  @ondragover:preventDefault="true"
+                  @ondrop:preventDefault="true"
+                  @ondrop="OnDrop"
+                  value="@TabPresenter.ActiveTab.MarkdownText"
+                  placeholder="Start writing Markdown here..."
+                  spellcheck="false"></textarea>
+    </div>
+</div>

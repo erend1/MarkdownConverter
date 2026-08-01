@@ -1,0 +1,125 @@
+name: Feature or focused change
+description: Define a user-facing improvement or bounded internal change with explicit behavior and tests.
+title: "[Change]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Define the problem and outcome before prescribing classes or methods. A planner should be able to mark this Ready without another discovery pass.
+
+  - type: input
+    id: verified_revision
+    attributes:
+      label: Planned against revision
+      description: The main-branch commit used during investigation.
+      placeholder: main@0123456789abcdef
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem, evidence, and value
+      description: Explain the current limitation, evidence, affected user/system, and why it should be solved now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Required outcome
+      description: State observable behavior and preserved compatibility. Avoid implementation detail unless it is a true constraint.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      placeholder: |
+        In scope:
+        - ...
+
+        Out of scope:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture invariants
+      description: List dependency, state-ownership, platform, compatibility, async, or error-handling rules the solution must preserve.
+      placeholder: Reference docs/architecture/guardrails.md and any accepted ADR.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and collision surface
+      description: List blocked-by/unblocks relationships and likely shared files, capabilities, or active branches.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Number each independently verifiable criterion.
+      placeholder: |
+        AC1. ...
+        AC2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Existing and required tests
+      description: Identify tests to preserve and the cheapest sufficient new evidence for success and relevant failure modes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: refactor_allowance
+    attributes:
+      label: Refactor allowance
+      description: Incidental cleanup is never included.
+      options:
+        - None - change existing behavior at the current seam
+        - Local - a focused extraction or adapter is required for correctness/testability
+        - Architectural - the issue explicitly changes an ownership or dependency boundary
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested_approach
+    attributes:
+      label: Suggested implementation (optional)
+      description: Record investigated options or likely seams. Clearly identify suggestions that workers may revise.
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options:
+        - Low - local additive behavior
+        - Medium - multiple consumers, state, lifecycle, or performance impact
+        - High - public contract, persisted data, security, release, or cross-cutting architecture
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: ready_check
+    attributes:
+      label: Readiness check
+      options:
+        - label: Dependencies and unresolved product decisions are explicit.
+          required: true
+        - label: Acceptance criteria describe outcomes rather than merely listing files to edit.
+          required: true
+        - label: Tests cover the failure and lifecycle cases relevant to this change.
+          required: true

@@ -1,0 +1,18 @@
+@implements MarkdownConverter.WebApp.Core.Views.IBibliographyView
+
+<div class="bib-upload">
+    @if (Presenter.ViewModel.IsLoaded)
+    {
+        <span class="bib-info" title="@Presenter.ViewModel.BibFileName">
+            Bib: @Presenter.ViewModel.EntryCount entries
+        </span>
+        <button class="btn btn-sm" @onclick="OnClear" title="Remove bibliography">x</button>
+    }
+    else
+    {
+        <label class="btn btn-sm btn-bib" title="Upload .bib bibliography file">
+            .bib
+            <InputFile OnChange="OnFileSelected" accept=".bib" style="display:none" />
+        </label>
+    }
+</div>

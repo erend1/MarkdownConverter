@@ -1,0 +1,342 @@
+using System.Text;
+using MarkdownConverter.WebApp.Core.Services;
+
+namespace MarkdownConverter.WebApp.Core.Presenters;
+
+public sealed class FindPresenter : IFindPresenter
+{
+    private readonly FindEngine _engine;
+    private readonly FindSession _session;
+    private readonly IEditorBridge _bridge;
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
+    private readonly object _generationSync = new();
+    private long _operationGeneration;
+    private string? _activePattern;
+    private FindOptions? _activeOptions;
+
+    /// <summary>
+    /// Tracks whether <see cref="_session"/> has been seeded from the
+    /// caret yet. Reset when the cached state is invalidated so the next
+    /// navigation call seeds from where the user was typing.
+    /// </summary>
+    private bool _seededFromCaret;
+
+    /// <summary>
+    /// Find-in-selection scope. When both non-null, the engine restricts
+    /// matches to <c>[ScopeStart, ScopeEnd)</c>.
+    /// </summary>
+    private int? _scopeStart;
+    private int? _scopeEnd;
+
+    public FindPresenter(FindEngine engine, FindSession session, IEditorBridge bridge)
+    {
+        _engine = engine;
+        _session = session;
+        _bridge = bridge;
+    }
+
+    public async Task<FindResult> NextAsync(string selector, string pattern, FindOptions options)
+        => await RunOperationAsync(
+            BeginQueryOperation(pattern, options),
+            generation => NavigateAsync(selector, pattern, options, forward: true, generation),
+            FindResult.Stale);
+
+    public async Task<FindResult> PrevAsync(string selector, string pattern, FindOptions options)
+        => await RunOperationAsync(
+            BeginQueryOperation(pattern, options),
+            generation => NavigateAsync(selector, pattern, options, forward: false, generation),
+            FindResult.Stale);
+
+    private async Task<FindResult> NavigateAsync(
+        string selector,
+        string pattern,
+        FindOptions options,
+        bool forward,
+        long generation)
+    {
+        if (string.IsNullOrEmpty(pattern))
+            return new FindResult { Total = 0, Index = -1 };
+
+        var text = await _bridge.GetValueAsync(selector);
+        if (!IsCurrent(generation)) return FindResult.Stale;
+
+        var needsRecompute = _session.NeedsRecompute(text, pattern, options, _scopeStart, _scopeEnd);
+        _session.EnsureUpToDate(text, pattern, options, _scopeStart, _scopeEnd);
+
+        if (needsRecompute) _seededFromCaret = false;
+
+        if (!_seededFromCaret && _session.Matches.Count > 0)
+        {
+            var range = await _bridge.GetSelectionAsync(selector);
+            if (!IsCurrent(generation)) return FindResult.Stale;
+            _session.SeedFromCaret(range.Start);
+            _seededFromCaret = true;
+        }
+
+        var result = forward ? _session.Next() : _session.Prev();
+
+        if (_session.Current is { } match)
+        {
+            if (!IsCurrent(generation)) return FindResult.Stale;
+            await _bridge.SetSelectionAsync(selector, match.Start, match.End);
+            if (!IsCurrent(generation)) return FindResult.Stale;
+            await _bridge.ScrollSelectionIntoViewAsync(selector);
+            if (!IsCurrent(generation)) return FindResult.Stale;
+        }
+
+        return result;
+    }
+
+    public async Task<FindReplaceResult> ReplaceNextAsync(
+        string selector, string pattern, string replacement, FindOptions options)
+        => await RunOperationAsync(
+            BeginQueryOperation(pattern, options),
+            generation => ReplaceNextCoreAsync(
+                selector, pattern, replacement, options, generation),
+            FindReplaceResult.Stale);
+
+    private async Task<FindReplaceResult> ReplaceNextCoreAsync(
+        string selector,
+        string pattern,
+        string replacement,
+        FindOptions options,
+        long generation)
+    {
+        if (string.IsNullOrEmpty(pattern)) return new FindReplaceResult();
+
+        // Verify the pattern compiles before touching the DOM, and reuse
+        // the engine for the "is current selection a match?" check below.
+        try
+        {
+            _engine.FindAll(string.Empty, pattern, options);
+        }
+        catch (FindPatternException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.InvalidPattern };
+        }
+        catch (FindTimeoutException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.TimedOut };
+        }
+
+        var text = await _bridge.GetValueAsync(selector);
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        var selection = await _bridge.GetSelectionAsync(selector);
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        if (selection.End <= selection.Start)
+        {
+            // No selection on the textarea — fall through to plain navigate.
+            var navigation = await NavigateAsync(
+                selector, pattern, options, forward: true, generation);
+            return new FindReplaceResult
+            {
+                Failure = navigation.Failure,
+                IsStale = navigation.IsStale
+            };
+        }
+
+        // Is the user's current selection itself a match?
+        var selected = text.Substring(selection.Start, selection.End - selection.Start);
+        IReadOnlyList<TextMatch> matchesAtSelection;
+        try
+        {
+            matchesAtSelection = _engine.FindAll(selected, pattern, options);
+        }
+        catch (FindPatternException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.InvalidPattern };
+        }
+        catch (FindTimeoutException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.TimedOut };
+        }
+        var isExactMatch = matchesAtSelection.Count == 1
+            && matchesAtSelection[0].Start == 0
+            && matchesAtSelection[0].End == selected.Length;
+
+        if (isExactMatch)
+        {
+            // execCommand insertText edits the textarea while keeping the
+            // browser's undo stack — better than overwriting el.value.
+            if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+            await _bridge.InsertTextAtCursorAsync(selector, replacement);
+            // Document changed → invalidate cached find state.
+            _session.Reset();
+            _seededFromCaret = false;
+            return IsCurrent(generation)
+                ? new FindReplaceResult { Count = 1 }
+                : FindReplaceResult.Stale;
+        }
+
+        // Selection isn't a match — just navigate so the user can decide.
+        var result = await NavigateAsync(selector, pattern, options, forward: true, generation);
+        return new FindReplaceResult
+        {
+            Failure = result.Failure,
+            IsStale = result.IsStale
+        };
+    }
+
+    public async Task<FindReplaceResult> ReplaceAllAsync(
+        string selector, string pattern, string replacement, FindOptions options)
+        => await RunOperationAsync(
+            BeginQueryOperation(pattern, options),
+            generation => ReplaceAllCoreAsync(
+                selector, pattern, replacement, options, generation),
+            FindReplaceResult.Stale);
+
+    private async Task<FindReplaceResult> ReplaceAllCoreAsync(
+        string selector,
+        string pattern,
+        string replacement,
+        FindOptions options,
+        long generation)
+    {
+        if (string.IsNullOrEmpty(pattern)) return new FindReplaceResult();
+
+        var text = await _bridge.GetValueAsync(selector);
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        IReadOnlyList<TextMatch> matches;
+        try
+        {
+            matches = _engine.FindAll(text, pattern, options);
+        }
+        catch (FindPatternException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.InvalidPattern };
+        }
+        catch (FindTimeoutException)
+        {
+            return new FindReplaceResult { Failure = FindFailure.TimedOut };
+        }
+        if (matches.Count == 0) return new FindReplaceResult();
+
+        var newText = BuildReplacedText(text, matches, replacement);
+
+        // Single undoable edit: select the entire textarea, then insertText
+        // with the replacement document. Preserves the browser undo stack.
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        await _bridge.SetSelectionAsync(selector, 0, text.Length);
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        await _bridge.InsertTextAtCursorAsync(selector, newText);
+
+        _session.Reset();
+        _seededFromCaret = false;
+        return IsCurrent(generation)
+            ? new FindReplaceResult { Count = matches.Count }
+            : FindReplaceResult.Stale;
+    }
+
+    public void Reset()
+    {
+        CancelPendingOperations();
+        _session.Reset();
+        _seededFromCaret = false;
+        _scopeStart = null;
+        _scopeEnd = null;
+    }
+
+    public IReadOnlyList<TextMatch> Matches => _session.Matches;
+
+    public int CurrentIndex => _session.CurrentIndex;
+
+    public bool HasScope => _scopeStart is not null && _scopeEnd is not null;
+
+    public void RefreshAgainst(string text, string pattern, FindOptions options)
+    {
+        CancelPendingOperations();
+        if (string.IsNullOrEmpty(pattern))
+        {
+            _session.Reset();
+            _seededFromCaret = false;
+            return;
+        }
+        // EnsureUpToDate already short-circuits when none of the inputs
+        // changed, so calling this on every keystroke is cheap unless the
+        // user actually edited the document.
+        _session.EnsureUpToDate(text, pattern, options, _scopeStart, _scopeEnd);
+    }
+
+    public async Task SetScopeFromSelectionAsync(string selector)
+        => await RunOperationAsync(
+            CancelAndGetGeneration(),
+            async generation =>
+            {
+                var range = await _bridge.GetSelectionAsync(selector);
+                if (!IsCurrent(generation) || range.End <= range.Start) return false;
+                _scopeStart = range.Start;
+                _scopeEnd = range.End;
+                _seededFromCaret = false;
+                return true;
+            },
+            false);
+
+    public void ClearScope()
+    {
+        CancelPendingOperations();
+        _scopeStart = null;
+        _scopeEnd = null;
+        _seededFromCaret = false;
+    }
+
+    public void CancelPendingOperations() => CancelAndGetGeneration();
+
+    private async Task<T> RunOperationAsync<T>(
+        long generation,
+        Func<long, Task<T>> operation,
+        T staleResult)
+    {
+        await _operationGate.WaitAsync();
+        try
+        {
+            if (!IsCurrent(generation)) return staleResult;
+            return await operation(generation);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    private bool IsCurrent(long generation) =>
+        Volatile.Read(ref _operationGeneration) == generation;
+
+    private long BeginQueryOperation(string pattern, FindOptions options)
+    {
+        lock (_generationSync)
+        {
+            if (_activePattern != pattern || _activeOptions != options)
+            {
+                _activePattern = pattern;
+                _activeOptions = options;
+                _operationGeneration++;
+            }
+
+            return _operationGeneration;
+        }
+    }
+
+    private long CancelAndGetGeneration()
+    {
+        lock (_generationSync)
+        {
+            _operationGeneration++;
+            return _operationGeneration;
+        }
+    }
+
+    private static string BuildReplacedText(
+        string text, IReadOnlyList<TextMatch> matches, string replacement)
+    {
+        var sb = new StringBuilder(text.Length);
+        var cursor = 0;
+        foreach (var m in matches)
+        {
+            if (m.Start > cursor) sb.Append(text, cursor, m.Start - cursor);
+            sb.Append(replacement);
+            cursor = m.End;
+        }
+        if (cursor < text.Length) sb.Append(text, cursor, text.Length - cursor);
+        return sb.ToString();
+    }
+}

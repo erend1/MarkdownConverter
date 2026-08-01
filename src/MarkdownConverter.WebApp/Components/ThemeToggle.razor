@@ -1,0 +1,4 @@
+<button class="btn btn-theme" @onclick="OnToggle" title="Toggle dark/light mode">
+    <i class="icon icon-sm @(IsDark ? "lucide-sun" : "lucide-moon")"></i>
+    @(IsDark ? "Light" : "Dark")
+</button>

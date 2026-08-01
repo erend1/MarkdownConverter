@@ -1,0 +1,49 @@
+@namespace MarkdownConverter.WebApp.Components.Primitives
+
+<div class="find-bar">
+    <AppTextInput CssClass="find-input"
+                  Value="@_findText"
+                  ValueChanged="OnFindTextChanged"
+                  OnKeyDown="OnFindKeyDown"
+                  Placeholder="Find..."
+                  AutoFocus="true" />
+    @if (ShowReplace)
+    {
+        <AppTextInput CssClass="find-input"
+                      Value="@_replaceText"
+                      ValueChanged="OnReplaceTextChanged"
+                      Placeholder="Replace..." />
+        <AppButton Size="ButtonSize.Sm" OnClick="OnReplace" Title="Replace">Replace</AppButton>
+        <AppButton Size="ButtonSize.Sm" OnClick="OnReplaceAll" Title="Replace All">All</AppButton>
+    }
+    <AppToggleButton Active="@_useCaseSensitive"
+                     OnToggle="ToggleCaseSensitive"
+                     Label="Aa"
+                     Title="Match case (Aa)" />
+    <AppToggleButton Active="@_useWholeWord"
+                     OnToggle="ToggleWholeWord"
+                     Label="W"
+                     Title="Match whole word" />
+    <AppToggleButton Active="@_useRegex"
+                     Invalid="@_invalidRegex"
+                     OnToggle="ToggleRegex"
+                     Label=".*"
+                     Title="Use regular expression" />
+    <AppToggleButton Active="@_useInSelection"
+                     OnToggle="ToggleInSelection"
+                     Label="⇪"
+                     Title="Find in selection" />
+    <AppIconButton IconClass="btn btn-sm"
+                   OnClick="OnFindPrev"
+                   Title="Previous (Shift+Enter)">&uarr;</AppIconButton>
+    <AppIconButton IconClass="btn btn-sm"
+                   OnClick="OnFindNext"
+                   Title="Next (Enter)">&darr;</AppIconButton>
+    <AppButton Size="ButtonSize.Sm" OnClick="ToggleReplace"
+               Title="Toggle Replace (Ctrl+H)">
+        @(ShowReplace ? "Find" : "Replace")
+    </AppButton>
+    <span class="find-count @(_invalidRegex ? "find-count-invalid" : "")">@_matchInfo</span>
+    <AppIconButton IconClass="btn btn-sm find-close"
+                   OnClick="OnCloseClicked">&times;</AppIconButton>
+</div>

@@ -1,0 +1,20 @@
+<AppToolbarGroup>
+    <AppButton OnClick="OnNew" Title="New tab (Ctrl+N)" Icon="file-plus">New</AppButton>
+
+    <AppButton AsLabel="true" Title="Open .md file in new tab" Icon="folder-open">
+        Open
+        <InputFile OnChange="OnFileOpen" accept=".md,.markdown,.txt" style="display:none" />
+    </AppButton>
+
+    <AppButton OnClick="OnSave" Title="Save to session (Ctrl+S)" Icon="save">Save</AppButton>
+
+    <AppButton OnClick="OnSaveAs" Title="Download as .md (Ctrl+Shift+S)" Icon="download">Save As</AppButton>
+
+    <span class="toolbar-separator"></span>
+
+    <ExportPanel />
+
+    <span class="toolbar-separator"></span>
+
+    <BibliographyUpload />
+</AppToolbarGroup>

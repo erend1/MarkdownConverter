@@ -1,0 +1,850 @@
+/* CSS Custom Properties for theming */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-editor: #ffffff;
+    --bg-preview: #ffffff;
+    --bg-toolbar: #f0f0f0;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --border-color: #d1d9e0;
+    --accent-color: #0969da;
+    --accent-hover: #0550ae;
+    --success-color: #1a7f37;
+    --error-color: #cf222e;
+    --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+.dark {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-editor: #0d1117;
+    --bg-preview: #161b22;
+    --bg-toolbar: #21262d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --border-color: #30363d;
+    --accent-color: #58a6ff;
+    --accent-hover: #79c0ff;
+    --success-color: #3fb950;
+    --error-color: #f85149;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body, #app {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* App layout */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    background: var(--bg-toolbar);
+    border-bottom: 1px solid var(--border-color);
+    gap: 12px;
+    flex-shrink: 0;
+    min-height: 44px;
+}
+
+.toolbar-left {
+    flex-shrink: 0;
+}
+
+.toolbar-center {
+    flex: 1;
+    overflow-x: auto;
+}
+
+.toolbar-right {
+    flex-shrink: 0;
+}
+
+.app-logo {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent-color);
+    letter-spacing: -0.3px;
+}
+
+.app-main {
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Editor layout - split pane */
+.editor-layout {
+    display: flex;
+    height: 100%;
+}
+
+.editor-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.splitter {
+    width: 5px;
+    cursor: col-resize;
+    background: var(--border-color);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.splitter:hover {
+    background: var(--accent-color);
+}
+
+.preview-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Tab bar */
+.tab-bar {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    min-height: 32px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.tab-list {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px 4px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-right: 1px solid var(--border-color);
+    white-space: nowrap;
+    max-width: 180px;
+    transition: background 0.1s, color 0.1s;
+    user-select: none;
+}
+
+.tab:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.tab-active {
+    background: var(--bg-editor);
+    color: var(--text-primary);
+    font-weight: 500;
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-dirty {
+    color: var(--accent-color);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.tab-close,
+.tab-rename {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.5;
+    transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+
+.tab:hover .tab-close,
+.tab:hover .tab-rename,
+.tab-active .tab-close,
+.tab-active .tab-rename {
+    opacity: 1;
+}
+
+.tab-close:hover {
+    background: var(--error-color);
+    color: #fff;
+    opacity: 1;
+}
+
+.tab-rename:hover {
+    background: var(--accent-color);
+    color: #fff;
+    opacity: 1;
+}
+
+.tab-drag-over {
+    border-left: 2px solid var(--accent-color);
+}
+
+.tab-rename-input {
+    border: 1px solid var(--accent-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    padding: 1px 4px;
+    border-radius: 3px;
+    outline: none;
+    width: 120px;
+}
+
+.tab-new {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    transition: color 0.1s, background 0.1s;
+    flex-shrink: 0;
+}
+
+.tab-new:hover {
+    background: var(--bg-primary);
+    color: var(--accent-color);
+}
+
+/* Editor */
+.editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.editor-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.editor-filename {
+    font-weight: 600;
+}
+
+.editor-dirty {
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.editor-linecount,
+.editor-stats {
+    margin-left: auto;
+}
+
+/* Find/Replace bar */
+.find-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.find-input {
+    padding: 3px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    outline: none;
+    min-width: 140px;
+}
+
+.find-input:focus {
+    border-color: var(--accent-color);
+}
+
+.find-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.find-count-invalid {
+    color: var(--error-color);
+    font-weight: 500;
+}
+
+.find-toggle {
+    padding: 2px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none;
+}
+
+.find-toggle:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
+
+.find-toggle.active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #fff;
+}
+
+.find-toggle.invalid {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.find-toggle.invalid.active {
+    background: var(--error-color);
+    color: #fff;
+}
+
+.find-close {
+    margin-left: auto;
+}
+
+/*
+ * Textarea + mirror div for all-match highlighting.
+ *
+ * The .editor-mirror-wrap lays the textarea on top of a transparent
+ * <div> with identical styling. The mirror's <mark> spans light up
+ * every match; the current match wears .match-current (brighter
+ * shade). Both elements MUST share font, line-height, padding, tab-
+ * size, white-space, word-wrap and box-sizing exactly, or the
+ * highlights will drift away from the text the user is editing.
+ */
+.editor-mirror-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.editor-mirror,
+.editor-textarea {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 16px;
+    border: none;
+    outline: none;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+    tab-size: 4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.editor-mirror {
+    color: transparent;
+    background: var(--bg-editor);
+    pointer-events: none;
+    overflow: auto;       /* must allow internal scroll to sync with textarea */
+    user-select: none;
+}
+
+.editor-textarea {
+    flex: 1;
+    resize: none;
+    background: transparent; /* let the mirror's highlights show through */
+    color: var(--text-primary);
+}
+
+.editor-mirror mark {
+    color: transparent;     /* keep the text from the textarea; only paint the background */
+    background: rgba(255, 200, 0, 0.35);
+    border-radius: 2px;
+    padding: 0;
+    /* match the textarea's line metrics so the highlight box doesn't
+       grow taller than the line it sits behind */
+    line-height: inherit;
+}
+
+.editor-mirror mark.match-current {
+    background: rgba(255, 145, 0, 0.55);
+}
+
+/* A trailing newline at the end of the textarea is invisible until
+   you type something — but the mirror needs a non-empty terminator
+   so its height matches the textarea on the very last line.
+   .editor-mirror::after handles this by carving out a blank line at
+   end-of-text via a zero-width-space pseudo-element. */
+.editor-mirror::after {
+    content: "\200B";
+    display: inline-block;
+}
+
+.editor-textarea::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+/* Keep the find-match selection visible when focus is on the
+   find input. Browsers fall back to a dim gray for unfocused selections
+   by default, which made find next look like it did nothing. Explicit
+   ::selection styling overrides that with the accent colour for both
+   focused and unfocused states. */
+.editor-textarea::selection {
+    background: var(--accent-color);
+    color: #fff;
+}
+.editor-textarea::-moz-selection {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+/* Preview */
+.preview-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.preview-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.preview-loading {
+    color: var(--accent-color);
+    font-style: italic;
+}
+
+.preview-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+    background: var(--bg-preview);
+}
+
+/* Toolbar actions */
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* Icons (Lucide) */
+.icon { font-family: 'lucide'; font-size: 14px; line-height: 1; }
+.icon-sm { font-size: 12px; }
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    user-select: none;
+}
+
+.btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 1px;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-export {
+    background: var(--accent-color);
+    color: #fff;
+    border-color: var(--accent-color);
+    font-weight: 500;
+}
+
+.btn-export:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-pdf {
+    background: transparent;
+    color: var(--text-secondary);
+    border-style: dashed;
+}
+
+.btn-pdf:hover {
+    color: var(--text-primary);
+    border-style: solid;
+}
+
+.btn-compile-pdf {
+    background: #cf222e;
+    color: #fff;
+    border-color: #cf222e;
+    font-weight: 500;
+}
+
+.btn-compile-pdf:hover:not(:disabled) {
+    background: #a40e26;
+    border-color: #a40e26;
+}
+
+.btn-sm {
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+.btn-theme {
+    font-size: 11px;
+    padding: 4px 9px;
+}
+
+/* Export panel */
+.export-panel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.export-select {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    transition: border-color 0.15s;
+    cursor: pointer;
+}
+
+.export-select:hover {
+    border-color: var(--text-secondary);
+}
+
+.export-select:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 1px;
+}
+
+.export-message {
+    font-size: 11px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.export-message.success { color: var(--success-color); }
+.export-message.error { color: var(--error-color); }
+
+/* Bibliography */
+.bib-upload {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bib-info {
+    font-size: 11px;
+    color: var(--success-color);
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 360px;
+    word-wrap: break-word;
+}
+
+.toast-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.toast-action {
+    background: rgba(255, 255, 255, 0.18);
+    color: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    font: inherit;
+    font-size: 11px;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.toast-action:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.toast-close {
+    background: transparent;
+    color: inherit;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.15s;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+
+.toast-success {
+    background: var(--success-color);
+    color: #fff;
+}
+
+.toast-error {
+    background: var(--error-color);
+    color: #fff;
+}
+
+.toast-info {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+.toast-fade-in {
+    animation: toastIn 0.3s ease;
+}
+
+.toast-fade-out {
+    animation: toastOut 0.5s ease forwards;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Error details modal */
+.dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: dialogBackdropIn 0.15s ease;
+}
+
+.dialog {
+    width: min(720px, 92vw);
+    max-height: 80vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    animation: dialogIn 0.18s ease;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.dialog-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--error-color);
+}
+
+.dialog-close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.15s;
+}
+
+.dialog-close:hover {
+    color: var(--text-primary);
+}
+
+.dialog-body {
+    margin: 0;
+    padding: 14px 16px;
+    overflow: auto;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1 1 auto;
+}
+
+.dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.dialog-copy-status {
+    margin-right: auto;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+@keyframes dialogBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes dialogIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Loading screen */
+.loading-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: var(--text-secondary);
+    font-size: 16px;
+}
