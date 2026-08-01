@@ -51,6 +51,12 @@ jobs:
       - name: Publish Desktop
         run: dotnet publish src/MarkdownConverter.Desktop/MarkdownConverter.Desktop.csproj --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:Version=${{ steps.parse.outputs.version }} --output publish/desktop
 
+      - name: Include license notices
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath LICENSE -Destination publish/desktop/LICENSE.txt
+          Copy-Item -LiteralPath THIRD-PARTY-NOTICES.md -Destination publish/desktop/THIRD-PARTY-NOTICES.md
+
       - name: Zip artifact
         shell: pwsh
         run: |

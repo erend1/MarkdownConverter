@@ -2,6 +2,8 @@
 
 A .NET 8 application that converts Markdown (`.md`) files to multiple output formats including **Word (.docx)**, **PDF**, and **LaTeX (.tex)**. Features a **Blazor WebAssembly** editor with live preview, dark/light themes, and browser-based export. Built with Clean Architecture principles, fully extensible, and designed to support multiple frontends.
 
+Use the hosted WebApp at <https://erend1.github.io/MarkdownConverter/>.
+
 ## Features
 
 - **Multi-format export** — Convert Markdown to Word, PDF, or LaTeX from a single codebase
@@ -586,13 +588,13 @@ The factory, service, CLI, and all future UIs automatically pick up the new form
 | **Infrastructure** | Markdig 0.38.0, DocumentFormat.OpenXml 3.2.0, Microsoft.Extensions.DependencyInjection.Abstractions 8.0.2 |
 | **CLI** | Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.Hosting |
 | **WebApp.Core** | *(Core only)* |
-| **WebApp** | Microsoft.AspNetCore.Components.WebAssembly 8.0.0 |
+| **WebApp** | Microsoft.AspNetCore.Components.WebAssembly 8.0.29 |
 | **Desktop** | Microsoft.Web.WebView2 1.0.2739.15, Microsoft.Extensions.DependencyInjection 9.0.0 |
 | **Tests** | xUnit, Moq, coverlet.collector |
 
 ## License
 
-MarkdownConverter is licensed under the [Apache License 2.0](LICENSE). Third-party components remain subject to their respective licenses.
+MarkdownConverter is licensed under the [Apache License 2.0](LICENSE). Third-party components remain subject to the licenses reproduced in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Contributing
 

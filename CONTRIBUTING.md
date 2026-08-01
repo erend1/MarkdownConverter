@@ -1,8 +1,10 @@
 # Contributing to MarkdownConverter
 
-MarkdownConverter uses a maintainer-directed workflow. Issues and evidence are welcome. Open or obtain approval for a Ready issue before submitting code; unsolicited pull requests may be closed without review.
+MarkdownConverter is publicly readable but owner-developed. Bug reports, reproducible evidence, and design feedback are welcome through GitHub issues, but external code contributions are not accepted. Branches and pull requests are created only by the repository owner or owner-directed agents operating through the owner's account; pull requests from other accounts will be closed.
 
 ## Before making a change
+
+This development workflow applies to the repository owner and explicitly assigned agents. Public visibility by itself is not authorization to implement an issue.
 
 1. Start from an approved, ready GitHub issue.
 2. Read [AGENTS.md](AGENTS.md), even when working manually.
@@ -52,10 +54,10 @@ Use the repository pull request template and keep its handoff section updated in
 - Raise a separate issue for useful cleanup that is not necessary for the current outcome.
 - Never rewrite shared history, force-push a protected branch, merge, tag, or release without maintainer approval.
 
-## Licensing and external contributions
+## Licensing and external feedback
 
-The project is licensed under the [Apache License 2.0](LICENSE). By intentionally submitting a contribution for inclusion, you agree that it may be distributed under that license.
+The project is licensed under the [Apache License 2.0](LICENSE). Opening an issue does not transfer ownership of the report or authorize incorporation of separately copyrighted code or assets.
 
 Do not add third-party code, generated assets, fonts, or packages whose license is incompatible or unclear. Record required notices and obtain maintainer approval before adding a production dependency.
 
-Repository visibility does not grant merge, release, or settings authority. The maintainer retains final control over accepted changes and publication.
+Repository visibility does not grant implementation, merge, release, or settings authority. The owner retains final control over all source changes and publication.

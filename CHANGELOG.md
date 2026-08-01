@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Added cost-conscious GitHub Pages deployment after the existing `build-test` job succeeds on `main`.
+- Added third-party license notices to source, Pages, and Desktop release distributions.
+
 ### Changed
 
 - Updated the CI and release workflows to GitHub Actions versions that run on Node.js 24.
