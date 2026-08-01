@@ -1,6 +1,6 @@
 # MarkdownConverter
 
-A .NET 8 application that converts Markdown (`.md`) files to multiple output formats including **Word (.docx)**, **PDF**, and **LaTeX (.tex)**. Features a **Blazor WebAssembly** editor with live preview, dark/light themes, and browser-based export. Built with Clean Architecture principles, fully extensible, and designed to support multiple frontends.
+A .NET 10 application that converts Markdown (`.md`) files to multiple output formats including **Word (.docx)**, **PDF**, and **LaTeX (.tex)**. Features a **Blazor WebAssembly** editor with live preview, dark/light themes, and browser-based export. Built with Clean Architecture principles, fully extensible, and designed to support multiple frontends.
 
 Use the hosted WebApp at <https://erend1.github.io/MarkdownConverter/>.
 
@@ -48,7 +48,7 @@ Use the hosted WebApp at <https://erend1.github.io/MarkdownConverter/>.
 
 ```
 MarkdownConverter/
-├── Directory.Build.props                          # Shared build config (net8.0, nullable)
+├── Directory.Build.props                          # Shared build config (net10.0, nullable)
 │
 ├── src/
 │   ├── MarkdownConverter.Core/                    # Domain layer — ZERO dependencies
@@ -86,7 +86,7 @@ MarkdownConverter/
 │   │   │   ├── CitationParser.cs                  # Markdig inline parser
 │   │   │   ├── CitationExtension.cs               # Markdig pipeline extension
 │   │   │   └── AttributionDetector.cs             # Detects "— Author" in blockquotes
-│   │   ├── Factories/ConverterFactory.cs           # .NET 8 keyed service resolution
+│   │   ├── Factories/ConverterFactory.cs           # .NET keyed service resolution
 │   │   ├── FileSystem/PhysicalFileSystem.cs
 │   │   ├── Parsing/MarkdigMarkdownParser.cs
 │   │   ├── Process/SystemProcessRunner.cs
@@ -143,7 +143,7 @@ Desktop ──> Core + Infrastructure     Hosts WebApp WASM output via WebView2
 
 ## Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **For PDF export**: A LaTeX distribution with `pdflatex` on your PATH
   - Windows: [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/)
   - macOS: `brew install --cask mactex`
@@ -398,7 +398,7 @@ Presenters hold ViewModels, receive user gestures from Views, orchestrate servic
 | **Strategy** | `IFormatConverter` | One implementation per export format |
 | **Factory** | `IConverterFactory` | Resolves the correct converter by `ExportFormat` enum |
 | **Dependency Inversion** | `IFileSystem`, `IProcessRunner`, `IMarkdownParser` | Isolate external dependencies for testability |
-| **Keyed Services** | `ServiceCollectionExtensions` | .NET 8 keyed DI for strategy resolution |
+| **Keyed Services** | `ServiceCollectionExtensions` | .NET keyed DI for strategy resolution |
 | **Presenter-View-Model** | `WebApp.Core` Presenters | Testable UI logic decoupled from Blazor |
 
 ### Export Format Details
@@ -585,11 +585,11 @@ The factory, service, CLI, and all future UIs automatically pick up the new form
 | Project | Packages |
 |---------|----------|
 | **Core** | *(none)* |
-| **Infrastructure** | Markdig 0.38.0, DocumentFormat.OpenXml 3.2.0, Microsoft.Extensions.DependencyInjection.Abstractions 8.0.2 |
-| **CLI** | Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.Hosting |
+| **Infrastructure** | Markdig 0.38.0, DocumentFormat.OpenXml 3.2.0, Microsoft.Extensions.DependencyInjection.Abstractions 10.0.10 |
+| **CLI** | Microsoft.Extensions.DependencyInjection 10.0.10, Microsoft.Extensions.Hosting 10.0.10 |
 | **WebApp.Core** | *(Core only)* |
-| **WebApp** | Microsoft.AspNetCore.Components.WebAssembly 8.0.29 |
-| **Desktop** | Microsoft.Web.WebView2 1.0.2739.15, Microsoft.Extensions.DependencyInjection 9.0.0 |
+| **WebApp** | Microsoft.AspNetCore.Components.WebAssembly 10.0.10, Microsoft.AspNetCore.Components.WebAssembly.DevServer 10.0.10 |
+| **Desktop** | Microsoft.Web.WebView2 1.0.2739.15, Microsoft.Extensions.DependencyInjection 10.0.10 |
 | **Tests** | xUnit, Moq, coverlet.collector |
 
 ## License

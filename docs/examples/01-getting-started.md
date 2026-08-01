@@ -1,6 +1,6 @@
 # Getting Started with MarkdownConverter
 
-Welcome to **MarkdownConverter** — a .NET 8 tool that transforms your Markdown files into professional documents.
+Welcome to **MarkdownConverter** — a .NET 10 tool that transforms your Markdown files into professional documents.
 
 ## What You Can Do
 
@@ -51,7 +51,7 @@ Visit the [.NET Documentation](https://learn.microsoft.com/dotnet) to learn more
 
 **Ordered:**
 
-1. Install .NET 8 SDK
+1. Install .NET 10 SDK
 2. Clone the repository
 3. Run `dotnet build`
 4. Convert your first document
