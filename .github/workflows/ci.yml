@@ -50,11 +50,15 @@ jobs:
           $siteRoot = Join-Path $env:RUNNER_TEMP 'pages-publish/wwwroot'
           $indexPath = Join-Path $siteRoot 'index.html'
           $fallbackPath = Join-Path $siteRoot '404.html'
+          $assetManifestPath = Join-Path $siteRoot 'service-worker-assets.js'
           $baseHref = '/${{ github.event.repository.name }}/'
           $rootBaseTag = '<base href="/" />'
 
           if (-not (Test-Path -LiteralPath $indexPath)) {
             throw "Published index was not found at '$indexPath'."
+          }
+          if (-not (Test-Path -LiteralPath $assetManifestPath)) {
+            throw "Published service-worker asset manifest was not found at '$assetManifestPath'."
           }
 
           $index = Get-Content -Raw -LiteralPath $indexPath
@@ -64,6 +68,33 @@ jobs:
 
           $index = $index.Replace($rootBaseTag, "<base href=`"$baseHref`" />")
           Set-Content -LiteralPath $indexPath -Value $index -Encoding utf8 -NoNewline
+
+          $sha256 = [Security.Cryptography.SHA256]::Create()
+          try {
+            $indexHash = 'sha256-' + [Convert]::ToBase64String(
+              $sha256.ComputeHash([IO.File]::ReadAllBytes($indexPath)))
+          }
+          finally {
+            $sha256.Dispose()
+          }
+
+          $assetManifest = Get-Content -Raw -LiteralPath $assetManifestPath
+          $indexAssetPattern = '(?<prefix>"hash"\s*:\s*")[^"]+(?<suffix>",\s*"url"\s*:\s*"index\.html")'
+          $indexAssetMatches = [regex]::Matches($assetManifest, $indexAssetPattern)
+          if ($indexAssetMatches.Count -ne 1) {
+            throw "Expected exactly one index.html entry in '$assetManifestPath'."
+          }
+
+          $assetManifest = [regex]::Replace(
+            $assetManifest,
+            $indexAssetPattern,
+            {
+              param($match)
+              "$($match.Groups['prefix'].Value)$indexHash$($match.Groups['suffix'].Value)"
+            },
+            1)
+          Set-Content -LiteralPath $assetManifestPath -Value $assetManifest -Encoding utf8 -NoNewline
+
           Copy-Item -LiteralPath $indexPath -Destination $fallbackPath
           New-Item -Path (Join-Path $siteRoot '.nojekyll') -ItemType File -Force | Out-Null
           Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $siteRoot 'LICENSE.txt')
@@ -72,6 +103,7 @@ jobs:
           $requiredFiles = @(
             $indexPath,
             $fallbackPath,
+            $assetManifestPath,
             (Join-Path $siteRoot '.nojekyll'),
             (Join-Path $siteRoot 'LICENSE.txt'),
             (Join-Path $siteRoot 'THIRD-PARTY-NOTICES.md'),

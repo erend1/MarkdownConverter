@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Moved all production and test targets plus CI, Pages, and Desktop delivery to the .NET 10 LTS baseline.
 - Updated the CI and release workflows to GitHub Actions versions that run on Node.js 24.
 
+### Fixed
+
+- Restored repository-scoped PWA installation, update, and offline navigation behavior for GitHub Pages.
+
 ### Security
 
 - Updated WebAssembly and test dependencies to remove known vulnerable transitive packages.

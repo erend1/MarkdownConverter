@@ -3,6 +3,7 @@
     "short_name": "MDConvert",
     "description": "Markdown to Word, LaTeX & PDF converter with live preview",
     "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#0969da",
