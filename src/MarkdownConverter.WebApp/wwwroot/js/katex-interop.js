@@ -11,7 +11,12 @@ window.katexInterop = {
                 // Strip Markdig's \( and \) delimiters (may have whitespace around them)
                 text = text.replace(/^\\\(\s*/, '').replace(/\s*\\\)$/, '');
                 if (!text) return;
-                katex.render(text, el, { throwOnError: false, displayMode: false });
+                katex.render(text, el, {
+                    throwOnError: false,
+                    trust: false,
+                    maxExpand: 1000,
+                    displayMode: false
+                });
                 el.dataset.rendered = 'true';
             } catch (e) {
                 // Show error inline instead of raw delimiters
@@ -31,7 +36,12 @@ window.katexInterop = {
                 // Strip Markdig's \[ and \] delimiters — handle newlines and whitespace
                 text = text.replace(/^\\\[\s*/, '').replace(/\s*\\\]$/, '');
                 if (!text) return;
-                katex.render(text.trim(), el, { throwOnError: false, displayMode: true });
+                katex.render(text.trim(), el, {
+                    throwOnError: false,
+                    trust: false,
+                    maxExpand: 1000,
+                    displayMode: true
+                });
                 el.dataset.rendered = 'true';
             } catch (e) {
                 el.style.color = '#cf222e';

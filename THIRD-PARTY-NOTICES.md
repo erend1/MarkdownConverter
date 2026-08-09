@@ -138,10 +138,12 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 OF THE POSSIBILITY OF SUCH DAMAGE.
 
-## KaTeX 0.16.9
+## KaTeX 0.16.47
 
-KaTeX is loaded by the WebApp from a versioned CDN and is distributed under
-the MIT License.
+KaTeX is distributed with the WebApp as a reviewed local runtime subset from
+the authoritative npm package. The subset contains the minified JavaScript,
+a WOFF2-only stylesheet derived from the upstream stylesheet, and the required
+WOFF2 fonts. KaTeX is distributed under the MIT License.
 
 Copyright (c) 2013-2020 Khan Academy and other contributors
 
@@ -165,8 +167,11 @@ SOFTWARE.
 
 ## Lucide Static 0.460.0
 
-Lucide Static is loaded by the WebApp from a versioned CDN and is distributed
-under the ISC License. Portions derived from Feather are MIT-licensed.
+Lucide Static is distributed with the WebApp as a reviewed local runtime subset
+from the authoritative npm package. The subset contains the WOFF2 icon font and
+a local stylesheet mapping the seven icons used by the application. Lucide is
+distributed under the ISC License. Portions derived from Feather are
+MIT-licensed.
 
 Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part
 of Feather (MIT). All other copyright (c) for Lucide are held by Lucide

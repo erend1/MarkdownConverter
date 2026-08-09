@@ -1,0 +1,28 @@
+@font-face {
+    font-family: "lucide";
+    src: url("./lucide.woff2") format("woff2");
+    font-display: block;
+    font-style: normal;
+    font-weight: normal;
+}
+
+[class^="lucide-"],
+[class*=" lucide-"] {
+    font-family: "lucide" !important;
+    font-size: inherit;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    line-height: 1;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.lucide-file-plus::before { content: "\e0cd"; }
+.lucide-folder-open::before { content: "\e247"; }
+.lucide-save::before { content: "\e151"; }
+.lucide-download::before { content: "\e0b6"; }
+.lucide-pencil::before { content: "\e1f9"; }
+.lucide-sun::before { content: "\e17c"; }
+.lucide-moon::before { content: "\e122"; }
