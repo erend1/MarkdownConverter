@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Restored repository-scoped PWA installation, update, and offline navigation behavior for GitHub Pages.
+- Removed standalone WebApp Desktop-capability probes that produced expected 404 responses on GitHub Pages.
 
 ### Security
 

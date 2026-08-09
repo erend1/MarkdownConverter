@@ -28,7 +28,7 @@
         Print PDF
     </AppButton>
 
-    @if (_isDesktop)
+    @if (_canCompilePdf)
     {
         <AppButton Variant="ButtonVariant.CompilePdf"
                    OnClick="OnCompilePdf"

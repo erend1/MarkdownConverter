@@ -13,9 +13,10 @@ public partial class ExportPanel : IExportView
     [Inject] private ITabPresenter TabPresenter { get; set; } = default!;
     [Inject] private IBibliographyPresenter BibPresenter { get; set; } = default!;
     [Inject] private IToastService ToastService { get; set; } = default!;
+    [Inject] private IDesktopCapabilityProvider DesktopCapabilityProvider { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
-    private bool _isDesktop;
+    private bool _canCompilePdf;
     private bool _isCompiling;
 
     protected override void OnInitialized()
@@ -27,12 +28,9 @@ public partial class ExportPanel : IExportView
     {
         if (firstRender)
         {
-            try
-            {
-                _isDesktop = await JS.InvokeAsync<bool>("fileInterop.isDesktopMode");
-                StateHasChanged();
-            }
-            catch { /* Not in desktop mode */ }
+            var capabilities = await DesktopCapabilityProvider.GetCapabilitiesAsync();
+            _canCompilePdf = capabilities.CanCompilePdf;
+            StateHasChanged();
         }
     }
 
