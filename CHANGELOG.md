@@ -23,5 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Security
 
 - Updated WebAssembly and test dependencies to remove known vulnerable transitive packages.
+- Replaced unauthenticated CDN loading with inventoried local KaTeX 0.16.47 and Lucide Static 0.460.0 assets, clearing the known KaTeX 0.16.9 advisory ranges.
 
 The first published version will receive a dated section when its release candidate is approved.
