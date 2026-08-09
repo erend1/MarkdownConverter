@@ -100,6 +100,15 @@ public class PwaAssetContractTests
         Assert.DoesNotContain("uses: actions/upload-pages-artifact@v4", workflow);
     }
 
+    [Fact]
+    public void PagesDeployment_UsesOfficialNode24CompatibleAction()
+    {
+        var workflow = ReadRepositoryFile(".github", "workflows", "ci.yml");
+
+        Assert.Contains("uses: actions/deploy-pages@v5", workflow);
+        Assert.DoesNotContain("uses: actions/deploy-pages@v4", workflow);
+    }
+
     private static string ReadRepositoryFile(params string[] pathSegments) =>
         File.ReadAllText(Path.Combine([RepositoryRoot, .. pathSegments]));
 
