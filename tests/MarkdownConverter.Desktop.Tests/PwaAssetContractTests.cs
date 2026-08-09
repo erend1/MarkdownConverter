@@ -90,6 +90,15 @@ public class PwaAssetContractTests
         Assert.Contains("Set-Content -LiteralPath $assetManifestPath", workflow);
     }
 
+    [Fact]
+    public void PagesUpload_UsesOfficialNode24CompatibleAction()
+    {
+        var workflow = ReadRepositoryFile(".github", "workflows", "ci.yml");
+
+        Assert.Contains("uses: actions/upload-pages-artifact@v5", workflow);
+        Assert.DoesNotContain("uses: actions/upload-pages-artifact@v4", workflow);
+    }
+
     private static string ReadRepositoryFile(params string[] pathSegments) =>
         File.ReadAllText(Path.Combine([RepositoryRoot, .. pathSegments]));
 
