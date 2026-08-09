@@ -119,6 +119,7 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ runner.temp }}/pages-publish/wwwroot
+          include-hidden-files: true
 
   deploy-pages:
     if: github.event_name != 'pull_request' && github.event.repository.private == false

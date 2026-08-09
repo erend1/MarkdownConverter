@@ -96,6 +96,7 @@ public class PwaAssetContractTests
         var workflow = ReadRepositoryFile(".github", "workflows", "ci.yml");
 
         Assert.Contains("uses: actions/upload-pages-artifact@v5", workflow);
+        Assert.Contains("include-hidden-files: true", workflow);
         Assert.DoesNotContain("uses: actions/upload-pages-artifact@v4", workflow);
     }
 
