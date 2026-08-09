@@ -8,6 +8,7 @@ using MarkdownConverter.Infrastructure.Converters;
 using MarkdownConverter.Infrastructure.Factories;
 using MarkdownConverter.Infrastructure.Parsing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MarkdownConverter.WebApp.Services;
 
@@ -39,6 +40,17 @@ public static class WasmServiceCollectionExtensions
         services.AddScoped<IToastService, ToastService>();
         services.AddScoped<IErrorDetailsService, ErrorDetailsService>();
         services.AddScoped<IEditorBridge, EditorBridge>();
+        services.AddScoped<BrowserDesktopCapabilityAdapter>();
+        services.AddScoped<IDesktopCapabilityProvider>(provider =>
+        {
+            var adapter = provider.GetRequiredService<BrowserDesktopCapabilityAdapter>();
+            var logger = provider.GetRequiredService<ILogger<BrowserDesktopCapabilityAdapter>>();
+            return new DesktopCapabilityProvider(
+                adapter.ReadAsync,
+                exception => logger.LogError(
+                    exception,
+                    "Desktop capability detection failed; Desktop-only features are disabled."));
+        });
         services.AddSingleton<FindEngine>();
         services.AddScoped<FindSession>();
         services.AddScoped<KaTeXInterop>();

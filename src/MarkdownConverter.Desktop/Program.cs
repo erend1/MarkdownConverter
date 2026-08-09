@@ -62,6 +62,17 @@ static class Program
 
 sealed class MainForm : Form
 {
+    private const string DesktopCapabilitiesScript = """
+        Object.defineProperty(window, '__markdownConverterDesktopCapabilities', {
+            value: Object.freeze({
+                canCompilePdf: true,
+                canReceivePendingFiles: true
+            }),
+            writable: false,
+            configurable: false
+        });
+        """;
+
     private readonly WebView2 _webView;
     private HttpListener? _listener;
     private readonly int _port;
@@ -155,6 +166,11 @@ sealed class MainForm : Form
         // App-like settings: no context menu, no status bar
         _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
         _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+
+        // Publish Desktop capabilities before any application document or
+        // script runs. The API endpoints remain the authority for operations.
+        await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+            DesktopCapabilitiesScript);
 
         // Navigate to the local server
         _webView.CoreWebView2.Navigate($"http://localhost:{_port}/");

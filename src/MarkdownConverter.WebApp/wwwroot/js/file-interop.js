@@ -1,3 +1,15 @@
+window.desktopCapabilities = {
+    read: function () {
+        var marker = window.__markdownConverterDesktopCapabilities;
+        if (!marker || typeof marker !== 'object') return null;
+
+        return {
+            canCompilePdf: marker.canCompilePdf === true,
+            canReceivePendingFiles: marker.canReceivePendingFiles === true
+        };
+    }
+};
+
 window.fileInterop = {
     // Save with a "Save As" dialog when the host browser supports the
     // File System Access API; otherwise fall back to a legacy <a download>
@@ -83,16 +95,6 @@ window.fileInterop = {
             return true;
         } catch (e) {
             console.warn('Clipboard write failed:', e);
-            return false;
-        }
-    },
-
-    // Check if running in Desktop mode (local API available)
-    isDesktopMode: async function () {
-        try {
-            var resp = await fetch('/api/desktop-status', { method: 'GET' });
-            return resp.status === 204;
-        } catch {
             return false;
         }
     },

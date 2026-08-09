@@ -12,6 +12,7 @@ public partial class EditorPage : IDisposable
     [Inject] private ITabPresenter TabPresenter { get; set; } = default!;
     [Inject] private IBibliographyPresenter BibPresenter { get; set; } = default!;
     [Inject] private IToastService ToastService { get; set; } = default!;
+    [Inject] private IDesktopCapabilityProvider DesktopCapabilityProvider { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private DotNetObjectReference<EditorPage>? _dotNetRef;
@@ -59,7 +60,8 @@ public partial class EditorPage : IDisposable
                     "Saved session was corrupted and has been backed up. Starting fresh.");
             }
 
-            if (await IsDesktopModeAsync())
+            var capabilities = await DesktopCapabilityProvider.GetCapabilitiesAsync();
+            if (capabilities.CanReceivePendingFiles)
             {
                 // Desktop-only: command-line file opens are exposed by the
                 // wrapper as a pending-file queue. Drain once at startup, then
@@ -68,18 +70,6 @@ public partial class EditorPage : IDisposable
                 await TryOpenPendingFilesAsync();
                 StartPendingFilePolling();
             }
-        }
-    }
-
-    private async Task<bool> IsDesktopModeAsync()
-    {
-        try
-        {
-            return await JS.InvokeAsync<bool>("fileInterop.isDesktopMode");
-        }
-        catch
-        {
-            return false;
         }
     }
 
@@ -120,8 +110,8 @@ public partial class EditorPage : IDisposable
         }
         catch
         {
-            // /api/pending-files isn't available outside the Desktop wrapper —
-            // any failure here means we're not in Desktop mode, ignore.
+            // The Desktop marker enables this path, but the queue endpoint can
+            // still become unavailable while the host is shutting down.
         }
     }
 
