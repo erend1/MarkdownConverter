@@ -62,6 +62,25 @@ public class PwaAssetContractTests
     }
 
     [Fact]
+    public void PublishedWorker_ResolvesCacheMissAndNetworkFailureWithoutRejectingFetchEvent()
+    {
+        var worker = ReadRepositoryFile(
+            "src",
+            "MarkdownConverter.WebApp",
+            "wwwroot",
+            "service-worker.published.js");
+
+        Assert.Contains("if (event.request.method === 'GET')", worker);
+        Assert.Contains("event.respondWith(onFetch(event));", worker);
+        Assert.Contains("return await fetch(event.request);", worker);
+        Assert.Contains("if (isNavigation)", worker);
+        Assert.Contains("'Content-Type': 'text/html; charset=utf-8'", worker);
+        Assert.Contains("status: 503", worker);
+        Assert.Contains("statusText: 'Service Unavailable'", worker);
+        Assert.DoesNotContain("return cachedResponse || fetch(event.request);", worker);
+    }
+
+    [Fact]
     public void DevelopmentAndDesktopWorkers_RemainNonCaching()
     {
         var developmentWorker = ReadRepositoryFile(
