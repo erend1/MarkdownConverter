@@ -2,7 +2,11 @@
 self.importScripts('./service-worker-assets.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
-self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
+self.addEventListener('fetch', event => {
+    if (event.request.method === 'GET') {
+        event.respondWith(onFetch(event));
+    }
+});
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
@@ -28,16 +32,41 @@ async function onActivate(event) {
 }
 
 async function onFetch(event) {
-    let cachedResponse = null;
-    if (event.request.method === 'GET') {
-        const shouldServeIndexHtml = event.request.mode === 'navigate'
-            && !manifestUrlList.some(url => url === event.request.url);
-        const request = shouldServeIndexHtml
-            ? new Request(new URL('index.html', scopeUrl))
-            : event.request;
+    const isNavigation = event.request.mode === 'navigate';
+    const shouldServeIndexHtml = isNavigation
+        && !manifestUrlList.some(url => url === event.request.url);
+    const request = shouldServeIndexHtml
+        ? new Request(new URL('index.html', scopeUrl))
+        : event.request;
+
+    try {
         const cache = await caches.open(cacheName);
-        cachedResponse = await cache.match(request);
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) return cachedResponse;
+    } catch {
+        // Cache Storage can be unavailable or cleared independently of the worker.
     }
 
-    return cachedResponse || fetch(event.request);
+    try {
+        return await fetch(event.request);
+    } catch {
+        if (isNavigation) {
+            return new Response(
+                '<!doctype html><meta charset="utf-8"><title>MD Converter unavailable</title>'
+                + '<p>MD Converter is temporarily unavailable. Reconnect and reload.</p>',
+                {
+                    status: 503,
+                    statusText: 'Service Unavailable',
+                    headers: {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        'Cache-Control': 'no-store'
+                    }
+                });
+        }
+
+        return new Response(null, {
+            status: 503,
+            statusText: 'Service Unavailable'
+        });
+    }
 }
