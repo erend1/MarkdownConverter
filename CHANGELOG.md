@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-08-11
+
+This is the first public alpha prerelease of MarkdownConverter. It is intended for early validation rather than production-critical workflows.
+
+### Release information
+
+- **Desktop platform:** Windows 10/11 x64, distributed as a self-contained portable zip.
+- **Runtime requirement:** Microsoft Edge WebView2 Runtime.
+- **Source identity:** The tag-triggered release workflow appends the exact source commit to the published release notes.
+
 ### Added
 
 - Added cost-conscious GitHub Pages deployment after the existing `build-test` job succeeds on `main`.
@@ -26,4 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Updated WebAssembly and test dependencies to remove known vulnerable transitive packages.
 - Replaced unauthenticated CDN loading with inventoried local KaTeX 0.16.47 and Lucide Static 0.460.0 assets, clearing the known KaTeX 0.16.9 advisory ranges.
 
-The first published version will receive a dated section when its release candidate is approved.
+### Known limitations
+
+- The Desktop distribution is unsigned and does not include an installer or automatic updates.
+- Desktop requires the WebView2 Runtime; compiled PDF export additionally requires a local LaTeX installation with the packages needed by the document.
+- This alpha supports Windows x64 only. The standalone WebApp remains available separately through GitHub Pages.

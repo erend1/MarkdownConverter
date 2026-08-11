@@ -60,6 +60,19 @@ jobs:
           Copy-Item -LiteralPath LICENSE -Destination publish/desktop/LICENSE.txt
           Copy-Item -LiteralPath THIRD-PARTY-NOTICES.md -Destination publish/desktop/THIRD-PARTY-NOTICES.md
 
+      - name: Validate Desktop release payload
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            'publish/desktop/MarkdownConverter.exe',
+            'publish/desktop/LICENSE.txt',
+            'publish/desktop/THIRD-PARTY-NOTICES.md'
+          )
+          $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_) })
+          if ($missingFiles.Count -gt 0) {
+            throw "Desktop release payload is incomplete: $($missingFiles -join ', ')"
+          }
+
       - name: Zip artifact
         shell: pwsh
         run: |
@@ -81,14 +94,30 @@ jobs:
           $start = ($lines | Select-String -Pattern "^## \[$([regex]::Escape($ver))\]" | Select-Object -First 1).LineNumber
 
           if (-not $start) {
-            "## $ver`n`n_See commit history - no curated changelog entry for this version._" | Out-File release_notes.md -Encoding utf8
-            return
+            throw "CHANGELOG.md does not contain a curated section for version '$ver'."
           }
 
           $tail = $lines[$start..($lines.Length - 1)]
           $next = ($tail[1..($tail.Length - 1)] | Select-String -Pattern '^## \[' | Select-Object -First 1).LineNumber
           $end = if ($next) { $start + $next - 2 } else { $lines.Length - 1 }
           $lines[($start - 1)..$end] | Out-File release_notes.md -Encoding utf8
+
+          $releaseType = if ("${{ steps.parse.outputs.prerelease }}" -eq 'True') {
+            'Prerelease'
+          } else {
+            'Stable release'
+          }
+          $sourceSha = "${{ github.sha }}"
+          $sourceUrl = "${{ github.server_url }}/${{ github.repository }}/commit/$sourceSha"
+          @(
+            '',
+            '### Build provenance',
+            '',
+            "- Release type: $releaseType",
+            '- Supported artifact: self-contained Windows x64 Desktop archive.',
+            "- Source tag: ${{ steps.parse.outputs.tag }}",
+            "- Source commit: [$sourceSha]($sourceUrl)"
+          ) | Add-Content -LiteralPath release_notes.md -Encoding utf8
 
       - name: Create GitHub Release
         env:
