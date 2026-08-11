@@ -25,9 +25,9 @@ The production URL is <https://erend1.github.io/MarkdownConverter/>. Treat the `
 
 1. Decide the target channel and version.
 2. Add a `CHANGELOG.md` entry under `## [<version>] - <date>`.
-3. Commit the changelog and any release-prep changes to `main`.
-4. Push `main`.
-5. Create and push the tag:
+3. Open a release-preparation pull request and require the normal review and `build-test` check.
+4. Merge the approved preparation pull request and record the exact resulting `main` commit.
+5. From that exact commit, have an authorized owner create and push the protected tag:
 
    ```bash
    git tag v<version>
@@ -39,6 +39,7 @@ The production URL is <https://erend1.github.io/MarkdownConverter/>. Treat the `
    - `MarkdownConverter-<version>-win-x64.zip`
    - `MarkdownConverter-<version>-win-x64.zip.sha256`
    - release notes copied from the matching changelog section
+   - prerelease status, supported platform, known limitations, source tag, and exact source commit
 8. Verify the zip contains `LICENSE.txt` and `THIRD-PARTY-NOTICES.md`.
 9. Download the zip on a clean Windows 10/11 machine with WebView2 Runtime installed and smoke-test:
    - app opens
