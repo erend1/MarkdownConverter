@@ -12,7 +12,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="app.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="app.ico"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>

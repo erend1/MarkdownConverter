@@ -17,6 +17,17 @@ public class LaunchRequestFactoryTests
     }
 
     [Fact]
+    public void FromArgs_UnicodePathWithSpaces_PreservesExactPath()
+    {
+        var path = @"C:\Kullanıcılar\Hüseyin\Çalışma Notları\ölçüm özeti.md";
+
+        var request = LaunchRequestFactory.FromArgs(new[] { path }, AlwaysExists);
+
+        Assert.Equal(LaunchRequestKinds.OpenFile, request.Kind);
+        Assert.Equal(path, request.FilePath);
+    }
+
+    [Fact]
     public void FromArgs_NoFile_CreatesFocusRequest()
     {
         var request = LaunchRequestFactory.FromArgs(Array.Empty<string>(), AlwaysExists);

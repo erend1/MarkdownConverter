@@ -40,12 +40,26 @@ The production URL is <https://erend1.github.io/MarkdownConverter/>. Treat the `
    - `MarkdownConverter-<version>-win-x64.zip.sha256`
    - release notes copied from the matching changelog section
    - prerelease status, supported platform, known limitations, source tag, and exact source commit
-8. Verify the zip contains `LICENSE.txt` and `THIRD-PARTY-NOTICES.md`.
+8. Verify the zip contains `app.ico`, `LICENSE.txt`, and `THIRD-PARTY-NOTICES.md`.
 9. Download the zip on a clean Windows 10/11 machine with WebView2 Runtime installed and smoke-test:
    - app opens
    - new tab works
    - Markdown preview updates
    - save/open file works
+
+## Portable Markdown file associations
+
+The ZIP is portable: it does not install itself or automatically create or update Windows file associations. For an explicit launch or an `Open with` command, Windows must invoke the exact executable in the currently extracted directory and pass the selected file as a separately quoted argument:
+
+```text
+"C:\path\to\the\extracted\MarkdownConverter.exe" "%1"
+```
+
+The `"%1"` placeholder is required. Without it, MarkdownConverter starts but Windows does not provide the selected Markdown path. Quoting both the executable and `"%1"` preserves spaces and non-ASCII characters.
+
+To replace a stale association, open **Settings → Apps → Default apps**, search for `.md` (and `.markdown` if desired), choose MarkdownConverter, and browse to `MarkdownConverter.exe` in the current extracted directory. If Windows continues using an older path, remove that old MarkdownConverter entry or choose a different app for the extension first, then select the current executable again. Verify the resulting open command has the exact form above; moving the portable folder later requires selecting the executable again.
+
+These steps are user-controlled. MarkdownConverter does not write to the registry or silently replace an existing default application.
 
 ## If Release Fails
 
