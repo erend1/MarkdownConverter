@@ -65,6 +65,7 @@ jobs:
         run: |
           $requiredFiles = @(
             'publish/desktop/MarkdownConverter.exe',
+            'publish/desktop/app.ico',
             'publish/desktop/LICENSE.txt',
             'publish/desktop/THIRD-PARTY-NOTICES.md'
           )

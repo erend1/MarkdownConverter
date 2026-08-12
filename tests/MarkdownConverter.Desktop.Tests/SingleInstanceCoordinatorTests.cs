@@ -42,11 +42,12 @@ public class SingleInstanceCoordinatorTests
             $"MarkdownConverter.Tests.{suffix}",
             $"MarkdownConverter.Tests.{suffix}");
 
+        var expectedPath = @"C:\Kullanıcılar\Hüseyin\Çalışma Notları\ikinci ölçüm.md";
         await secondary.SendToPrimaryAsync(
             new LaunchRequest
             {
                 Kind = LaunchRequestKinds.OpenFile,
-                FilePath = @"C:\notes\b.md"
+                FilePath = expectedPath
             },
             cts.Token);
 
@@ -55,6 +56,6 @@ public class SingleInstanceCoordinatorTests
         await listener;
 
         Assert.Equal(LaunchRequestKinds.OpenFile, request.Kind);
-        Assert.Equal(@"C:\notes\b.md", request.FilePath);
+        Assert.Equal(expectedPath, request.FilePath);
     }
 }

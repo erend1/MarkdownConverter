@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Included the Desktop application icon in portable release archives and documented exact-path Markdown file associations for cold and single-instance launches.
+
 ## [0.1.0-alpha.1] - 2026-08-11
 
 This is the first public alpha prerelease of MarkdownConverter. It is intended for early validation rather than production-critical workflows.

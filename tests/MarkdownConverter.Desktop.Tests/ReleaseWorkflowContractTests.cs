@@ -42,10 +42,42 @@ public class ReleaseWorkflowContractTests
         Assert.Contains("--runtime win-x64 --self-contained true", workflow);
         Assert.Contains("/p:PublishSingleFile=true", workflow);
         Assert.Contains("publish/desktop/MarkdownConverter.exe", workflow);
+        Assert.Contains("publish/desktop/app.ico", workflow);
         Assert.Contains("publish/desktop/LICENSE.txt", workflow);
         Assert.Contains("publish/desktop/THIRD-PARTY-NOTICES.md", workflow);
         Assert.Contains("Get-FileHash $env:zip -Algorithm SHA256", workflow);
         Assert.Contains("$ghArgs += \"--prerelease\"", workflow);
+    }
+
+    [Fact]
+    public void DesktopProject_PublishesRuntimeIconSidecar()
+    {
+        var project = ReadRepositoryFile(
+            "src",
+            "MarkdownConverter.Desktop",
+            "MarkdownConverter.Desktop.csproj");
+
+        Assert.Contains("<ApplicationIcon>app.ico</ApplicationIcon>", project);
+        Assert.Contains("CopyToOutputDirectory=\"PreserveNewest\"", project);
+        Assert.Contains("CopyToPublishDirectory=\"PreserveNewest\"", project);
+        Assert.Contains("ExcludeFromSingleFile=\"true\"", project);
+    }
+
+    [Fact]
+    public void PortableAssociationGuidance_RequiresExactExecutableAndQuotedFileArgument()
+    {
+        var releasing = ReadRepositoryFile(".github", "RELEASING.md");
+        var readme = ReadRepositoryFile("README.md");
+        var program = ReadRepositoryFile("src", "MarkdownConverter.Desktop", "Program.cs");
+
+        Assert.Contains("\"C:\\path\\to\\the\\extracted\\MarkdownConverter.exe\" \"%1\"", releasing);
+        Assert.Contains("\"C:\\path\\to\\MarkdownConverter.exe\" \"%1\"", readme);
+        Assert.Contains("does not install itself or automatically create or update Windows file associations", releasing);
+        Assert.Contains("Settings → Apps → Default apps", releasing);
+        Assert.Contains("FocusExistingWindow();", program);
+        Assert.Contains("SetForegroundWindow(Handle);", program);
+        Assert.DoesNotContain("Microsoft.Win32", program);
+        Assert.DoesNotContain("Registry.", program);
     }
 
     private static string ReadRepositoryFile(params string[] pathSegments) =>

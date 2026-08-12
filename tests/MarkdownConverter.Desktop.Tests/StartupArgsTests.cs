@@ -80,6 +80,14 @@ public class StartupArgsTests
     }
 
     [Fact]
+    public void UnicodePathWithSpaces_IsPreservedExactly()
+    {
+        var path = @"C:\Kullanıcılar\Hüseyin\Çalışma Notları\ölçüm özeti.md";
+
+        Assert.Equal(path, StartupArgs.GetPendingFilePath(new[] { path }, AlwaysExists));
+    }
+
+    [Fact]
     public void OverloadWithoutFileExistsSeam_UsesRealFileSystem()
     {
         // Unique non-existent path — should return null without throwing.
