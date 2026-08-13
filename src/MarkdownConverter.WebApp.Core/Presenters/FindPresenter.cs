@@ -27,6 +27,7 @@ public sealed class FindPresenter : IFindPresenter
     /// </summary>
     private int? _scopeStart;
     private int? _scopeEnd;
+    private string? _scopeTextSnapshot;
 
     public FindPresenter(FindEngine engine, FindSession session, IEditorBridge bridge)
     {
@@ -59,6 +60,7 @@ public sealed class FindPresenter : IFindPresenter
 
         var text = await _bridge.GetValueAsync(selector);
         if (!IsCurrent(generation)) return FindResult.Stale;
+        ValidateScopeForText(text);
 
         var needsRecompute = _session.NeedsRecompute(text, pattern, options, _scopeStart, _scopeEnd);
         _session.EnsureUpToDate(text, pattern, options, _scopeStart, _scopeEnd);
@@ -69,7 +71,10 @@ public sealed class FindPresenter : IFindPresenter
         {
             var range = await _bridge.GetSelectionAsync(selector);
             if (!IsCurrent(generation)) return FindResult.Stale;
-            _session.SeedFromCaret(range.Start);
+            if (forward)
+                _session.SeedFromCaret(range.Start);
+            else
+                _session.SeedPreviousFromCaret(range.Start);
             _seededFromCaret = true;
         }
 
@@ -121,6 +126,7 @@ public sealed class FindPresenter : IFindPresenter
 
         var text = await _bridge.GetValueAsync(selector);
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        ValidateScopeForText(text);
         var selection = await _bridge.GetSelectionAsync(selector);
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
         if (selection.End <= selection.Start)
@@ -131,7 +137,8 @@ public sealed class FindPresenter : IFindPresenter
             return new FindReplaceResult
             {
                 Failure = navigation.Failure,
-                IsStale = navigation.IsStale
+                IsStale = navigation.IsStale,
+                Navigation = navigation
             };
         }
 
@@ -150,7 +157,10 @@ public sealed class FindPresenter : IFindPresenter
         {
             return new FindReplaceResult { Failure = FindFailure.TimedOut };
         }
-        var isExactMatch = matchesAtSelection.Count == 1
+        var isWithinScope = !HasScope
+            || (selection.Start >= _scopeStart && selection.End <= _scopeEnd);
+        var isExactMatch = isWithinScope
+            && matchesAtSelection.Count == 1
             && matchesAtSelection[0].Start == 0
             && matchesAtSelection[0].End == selected.Length;
 
@@ -160,9 +170,7 @@ public sealed class FindPresenter : IFindPresenter
             // browser's undo stack — better than overwriting el.value.
             if (!IsCurrent(generation)) return FindReplaceResult.Stale;
             await _bridge.InsertTextAtCursorAsync(selector, replacement);
-            // Document changed → invalidate cached find state.
-            _session.Reset();
-            _seededFromCaret = false;
+            ResetAfterDocumentEdit();
             return IsCurrent(generation)
                 ? new FindReplaceResult { Count = 1 }
                 : FindReplaceResult.Stale;
@@ -173,7 +181,8 @@ public sealed class FindPresenter : IFindPresenter
         return new FindReplaceResult
         {
             Failure = result.Failure,
-            IsStale = result.IsStale
+            IsStale = result.IsStale,
+            Navigation = result
         };
     }
 
@@ -196,10 +205,11 @@ public sealed class FindPresenter : IFindPresenter
 
         var text = await _bridge.GetValueAsync(selector);
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        ValidateScopeForText(text);
         IReadOnlyList<TextMatch> matches;
         try
         {
-            matches = _engine.FindAll(text, pattern, options);
+            matches = _engine.FindAll(text, pattern, options, _scopeStart, _scopeEnd);
         }
         catch (FindPatternException)
         {
@@ -220,8 +230,7 @@ public sealed class FindPresenter : IFindPresenter
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
         await _bridge.InsertTextAtCursorAsync(selector, newText);
 
-        _session.Reset();
-        _seededFromCaret = false;
+        ResetAfterDocumentEdit();
         return IsCurrent(generation)
             ? new FindReplaceResult { Count = matches.Count }
             : FindReplaceResult.Stale;
@@ -234,6 +243,7 @@ public sealed class FindPresenter : IFindPresenter
         _seededFromCaret = false;
         _scopeStart = null;
         _scopeEnd = null;
+        _scopeTextSnapshot = null;
     }
 
     public IReadOnlyList<TextMatch> Matches => _session.Matches;
@@ -242,19 +252,32 @@ public sealed class FindPresenter : IFindPresenter
 
     public bool HasScope => _scopeStart is not null && _scopeEnd is not null;
 
-    public void RefreshAgainst(string text, string pattern, FindOptions options)
+    public FindResult RefreshAgainst(string text, string pattern, FindOptions options)
     {
         CancelPendingOperations();
         if (string.IsNullOrEmpty(pattern))
         {
             _session.Reset();
             _seededFromCaret = false;
-            return;
+            return new FindResult { Index = -1 };
         }
+
+        // A captured textarea range belongs to the exact document snapshot
+        // it came from. Once that text changes, retaining the old offsets can
+        // search or replace an unrelated range, so fall back to whole-document
+        // search until the user explicitly captures a new selection.
+        ValidateScopeForText(text);
+
         // EnsureUpToDate already short-circuits when none of the inputs
         // changed, so calling this on every keystroke is cheap unless the
         // user actually edited the document.
         _session.EnsureUpToDate(text, pattern, options, _scopeStart, _scopeEnd);
+        return new FindResult
+        {
+            Total = _session.Matches.Count,
+            Index = _session.CurrentIndex,
+            Failure = _session.Failure
+        };
     }
 
     public async Task SetScopeFromSelectionAsync(string selector)
@@ -264,8 +287,11 @@ public sealed class FindPresenter : IFindPresenter
             {
                 var range = await _bridge.GetSelectionAsync(selector);
                 if (!IsCurrent(generation) || range.End <= range.Start) return false;
+                var text = await _bridge.GetValueAsync(selector);
+                if (!IsCurrent(generation)) return false;
                 _scopeStart = range.Start;
                 _scopeEnd = range.End;
+                _scopeTextSnapshot = text;
                 _seededFromCaret = false;
                 return true;
             },
@@ -276,6 +302,7 @@ public sealed class FindPresenter : IFindPresenter
         CancelPendingOperations();
         _scopeStart = null;
         _scopeEnd = null;
+        _scopeTextSnapshot = null;
         _seededFromCaret = false;
     }
 
@@ -323,6 +350,25 @@ public sealed class FindPresenter : IFindPresenter
             _operationGeneration++;
             return _operationGeneration;
         }
+    }
+
+    private void ResetAfterDocumentEdit()
+    {
+        _session.Reset();
+        _seededFromCaret = false;
+        _scopeStart = null;
+        _scopeEnd = null;
+        _scopeTextSnapshot = null;
+    }
+
+    private void ValidateScopeForText(string text)
+    {
+        if (!HasScope || _scopeTextSnapshot == text) return;
+
+        _scopeStart = null;
+        _scopeEnd = null;
+        _scopeTextSnapshot = null;
+        _seededFromCaret = false;
     }
 
     private static string BuildReplacedText(

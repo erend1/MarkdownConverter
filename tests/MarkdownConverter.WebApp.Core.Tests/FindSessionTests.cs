@@ -163,6 +163,30 @@ public class FindSessionTests
         Assert.Equal(0, r.Index); // wrap
     }
 
+    [Fact]
+    public void SeedPreviousFromCaret_BetweenMatches_PrevLandsOnPriorMatch()
+    {
+        var sut = New();
+        sut.EnsureUpToDate("xxx foo yyy foo zzz", "foo", FindOptions.Default);
+
+        sut.SeedPreviousFromCaret(8);
+        var r = sut.Prev();
+
+        Assert.Equal(0, r.Index);
+    }
+
+    [Fact]
+    public void SeedPreviousFromCaret_BeforeFirstMatch_PrevWrapsToLast()
+    {
+        var sut = New();
+        sut.EnsureUpToDate("xxx foo yyy foo zzz", "foo", FindOptions.Default);
+
+        sut.SeedPreviousFromCaret(0);
+        var r = sut.Prev();
+
+        Assert.Equal(1, r.Index);
+    }
+
     // ---------- invalid pattern ----------
 
     [Fact]

@@ -5,6 +5,8 @@ namespace MarkdownConverter.WebApp.Components.Primitives;
 
 public partial class AppTextInput
 {
+    private ElementReference _inputElement;
+
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public string? Placeholder { get; set; }
@@ -16,4 +18,11 @@ public partial class AppTextInput
 
     private Task OnInput(ChangeEventArgs e)
         => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+
+    /// <summary>
+    /// Explicitly focuses the rendered input after its owning component has
+    /// completed a render. Unlike the HTML autofocus attribute, this remains
+    /// reliable when another element already owns focus.
+    /// </summary>
+    public ValueTask FocusAsync() => _inputElement.FocusAsync(preventScroll: true);
 }

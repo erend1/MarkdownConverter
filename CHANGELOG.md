@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Restored reliable Ctrl/Cmd+F and Ctrl/Cmd+H focus, find/replace navigation, scoped-search cleanup, native-undo replacement, and shortcut listener disposal in the shared WebApp editor.
+
 ## [0.1.0-alpha.2] - 2026-08-12
 
 This patch prerelease corrects the portable Desktop packaging and file-open guidance from the first alpha.

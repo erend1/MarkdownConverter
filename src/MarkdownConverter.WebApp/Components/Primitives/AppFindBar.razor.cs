@@ -37,6 +37,7 @@ public partial class AppFindBar
     /// </summary>
     [Parameter] public string TextareaSelector { get; set; } = ".editor-textarea";
 
+    private AppTextInput? _findInput;
     private string _findText = string.Empty;
     private string _replaceText = string.Empty;
     private string _matchInfo = string.Empty;
@@ -45,6 +46,7 @@ public partial class AppFindBar
     private bool _useCaseSensitive;
     private bool _useInSelection;
     private bool _invalidRegex;
+    private bool _showingReplacementResult;
 
     private FindOptions CurrentOptions => new()
     {
@@ -60,6 +62,7 @@ public partial class AppFindBar
         _findText = value;
         _matchInfo = string.Empty;
         _invalidRegex = false;
+        _showingReplacementResult = false;
     }
 
     private void OnReplaceTextChanged(string value)
@@ -76,6 +79,8 @@ public partial class AppFindBar
         if (string.IsNullOrEmpty(_findText)) return;
         var result = await FindPresenter.NextAsync(TextareaSelector, _findText, CurrentOptions);
         if (result.IsStale) return;
+        _useInSelection = FindPresenter.HasScope;
+        _showingReplacementResult = false;
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -88,6 +93,8 @@ public partial class AppFindBar
         if (string.IsNullOrEmpty(_findText)) return;
         var result = await FindPresenter.PrevAsync(TextareaSelector, _findText, CurrentOptions);
         if (result.IsStale) return;
+        _useInSelection = FindPresenter.HasScope;
+        _showingReplacementResult = false;
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -101,12 +108,23 @@ public partial class AppFindBar
         var result = await FindPresenter.ReplaceNextAsync(
             TextareaSelector, _findText, _replaceText, CurrentOptions);
         if (result.IsStale) return;
+        _useInSelection = FindPresenter.HasScope;
         if (result.Failure != FindFailure.None)
         {
             UpdateFailure(result.Failure);
             return;
         }
         _invalidRegex = false;
+        if (result.Navigation is not null)
+        {
+            _showingReplacementResult = false;
+            UpdateMatchInfo(result.Navigation);
+        }
+        else
+        {
+            _showingReplacementResult = true;
+            _matchInfo = $"Replaced {result.Count}";
+        }
         await OnAfterFindChanged.InvokeAsync();
     }
 
@@ -119,12 +137,14 @@ public partial class AppFindBar
         var result = await FindPresenter.ReplaceAllAsync(
             TextareaSelector, _findText, _replaceText, CurrentOptions);
         if (result.IsStale) return;
+        _useInSelection = FindPresenter.HasScope;
         if (result.Failure != FindFailure.None)
         {
             UpdateFailure(result.Failure);
             return;
         }
         _invalidRegex = false;
+        _showingReplacementResult = true;
         _matchInfo = $"Replaced {result.Count}";
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -137,6 +157,12 @@ public partial class AppFindBar
             await OnFindPrev();
         else if (e.Key == "Enter")
             await OnFindNext();
+    }
+
+    private async Task OnReplaceKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            await OnCloseClicked();
     }
 
     private Task ToggleReplace() => ShowReplaceChanged.InvokeAsync(!ShowReplace);
@@ -207,7 +233,35 @@ public partial class AppFindBar
     {
         if (string.IsNullOrEmpty(_findText)) return;
         var text = await EditorBridge.GetValueAsync(TextareaSelector);
-        FindPresenter.RefreshAgainst(text, _findText, CurrentOptions);
+        var result = FindPresenter.RefreshAgainst(text, _findText, CurrentOptions);
+        _useInSelection = FindPresenter.HasScope;
+        if (_showingReplacementResult)
+            StateHasChanged();
+        else
+            UpdateMatchInfo(result);
+        await OnAfterFindChanged.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Focuses the query input after the host has rendered the bar. The host
+    /// calls this for both first-open and repeated find/replace shortcuts.
+    /// </summary>
+    public ValueTask FocusQueryAsync() =>
+        _findInput?.FocusAsync() ?? ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Clears ranges captured from the prior active document while retaining
+    /// the user's query and option controls. The next command recomputes
+    /// against the newly rendered textarea.
+    /// </summary>
+    public async Task OnActiveDocumentChangedAsync()
+    {
+        FindPresenter.Reset();
+        _useInSelection = false;
+        _invalidRegex = false;
+        _showingReplacementResult = false;
+        _matchInfo = string.Empty;
+        StateHasChanged();
         await OnAfterFindChanged.InvokeAsync();
     }
 
