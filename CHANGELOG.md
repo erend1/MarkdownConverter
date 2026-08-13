@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Restored reliable Ctrl/Cmd+F and Ctrl/Cmd+H focus, find/replace navigation, scoped-search cleanup, native-undo replacement, and shortcut listener disposal in the shared WebApp editor.
+- Restored reliable Ctrl/Cmd+F and Ctrl/Cmd+H focus, exact wrapped-line find navigation, repeatable find/replace actions, scoped-search cleanup, native-undo replacement, and shortcut listener disposal in the shared WebApp editor.
 
 ## [0.1.0-alpha.2] - 2026-08-12
 

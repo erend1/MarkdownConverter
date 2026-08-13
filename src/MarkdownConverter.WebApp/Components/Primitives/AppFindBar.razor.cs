@@ -47,6 +47,7 @@ public partial class AppFindBar
     private bool _useInSelection;
     private bool _invalidRegex;
     private bool _showingReplacementResult;
+    private bool _restoreCurrentMatchAfterRender;
 
     private FindOptions CurrentOptions => new()
     {
@@ -56,9 +57,29 @@ public partial class AppFindBar
         InSelection = _useInSelection
     };
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_restoreCurrentMatchAfterRender) return;
+
+        _restoreCurrentMatchAfterRender = false;
+        var currentIndex = FindPresenter.CurrentIndex;
+        var matches = FindPresenter.Matches;
+        if (currentIndex < 0 || currentIndex >= matches.Count) return;
+
+        // A render triggered by a find/replace button can restore the
+        // textarea's post-edit caret after navigation selected the next
+        // match. Reapply the C#-owned current range after that render, then
+        // let the browser adapter centre its rendered highlight geometry.
+        var match = matches[currentIndex];
+        await EditorBridge.SetSelectionAfterRenderAsync(
+            TextareaSelector, match.Start, match.End);
+        await EditorBridge.ScrollSelectionIntoViewAsync(TextareaSelector);
+    }
+
     private void OnFindTextChanged(string value)
     {
         FindPresenter.CancelPendingOperations();
+        _restoreCurrentMatchAfterRender = false;
         _findText = value;
         _matchInfo = string.Empty;
         _invalidRegex = false;
@@ -81,6 +102,7 @@ public partial class AppFindBar
         if (result.IsStale) return;
         _useInSelection = FindPresenter.HasScope;
         _showingReplacementResult = false;
+        ScheduleCurrentMatchRestore(result);
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -95,6 +117,7 @@ public partial class AppFindBar
         if (result.IsStale) return;
         _useInSelection = FindPresenter.HasScope;
         _showingReplacementResult = false;
+        ScheduleCurrentMatchRestore(result);
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -118,10 +141,12 @@ public partial class AppFindBar
         if (result.Navigation is not null)
         {
             _showingReplacementResult = false;
+            ScheduleCurrentMatchRestore(result.Navigation);
             UpdateMatchInfo(result.Navigation);
         }
         else
         {
+            _restoreCurrentMatchAfterRender = false;
             _showingReplacementResult = true;
             _matchInfo = $"Replaced {result.Count}";
         }
@@ -144,6 +169,7 @@ public partial class AppFindBar
             return;
         }
         _invalidRegex = false;
+        _restoreCurrentMatchAfterRender = false;
         _showingReplacementResult = true;
         _matchInfo = $"Replaced {result.Count}";
         await OnAfterFindChanged.InvokeAsync();
@@ -232,6 +258,7 @@ public partial class AppFindBar
     private async Task OnTextareaContentChangedCoreAsync()
     {
         if (string.IsNullOrEmpty(_findText)) return;
+        _restoreCurrentMatchAfterRender = false;
         var text = await EditorBridge.GetValueAsync(TextareaSelector);
         var result = FindPresenter.RefreshAgainst(text, _findText, CurrentOptions);
         _useInSelection = FindPresenter.HasScope;
@@ -257,6 +284,7 @@ public partial class AppFindBar
     public async Task OnActiveDocumentChangedAsync()
     {
         FindPresenter.Reset();
+        _restoreCurrentMatchAfterRender = false;
         _useInSelection = false;
         _invalidRegex = false;
         _showingReplacementResult = false;
@@ -268,7 +296,14 @@ public partial class AppFindBar
     private async Task OnCloseClicked()
     {
         FindPresenter.Reset();
+        _restoreCurrentMatchAfterRender = false;
         await OnClose.InvokeAsync();
+    }
+
+    private void ScheduleCurrentMatchRestore(FindResult result)
+    {
+        _restoreCurrentMatchAfterRender = result.Failure == FindFailure.None
+            && result.Index >= 0;
     }
 
     private void UpdateMatchInfo(FindResult result)

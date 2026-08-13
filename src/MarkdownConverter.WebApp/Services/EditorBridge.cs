@@ -22,6 +22,9 @@ public sealed class EditorBridge : IEditorBridge
     public ValueTask SetSelectionAsync(string selector, int start, int end) =>
         _js.InvokeVoidAsync("domBridge.setSelection", selector, start, end);
 
+    public ValueTask SetSelectionAfterRenderAsync(string selector, int start, int end) =>
+        _js.InvokeVoidAsync("domBridge.setSelectionAfterRender", selector, start, end);
+
     public ValueTask<string> GetValueAsync(string selector) =>
         _js.InvokeAsync<string>("domBridge.getValue", selector);
 

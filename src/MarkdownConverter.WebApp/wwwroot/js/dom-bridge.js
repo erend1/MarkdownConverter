@@ -20,6 +20,26 @@ window.domBridge = {
         el.selectionEnd = end;
     },
 
+    // A button-triggered Blazor render can restore the textarea's previous
+    // caret after C# has selected a find match. Wait until that browser/render
+    // cycle settles, then reapply the range to the same captured DOM node.
+    // The connectivity check prevents a late callback from touching a new tab.
+    setSelectionAfterRender: function (selector, start, end) {
+        var el = document.querySelector(selector);
+        if (!el) return Promise.resolve();
+        return new Promise(function (resolve) {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    if (el.isConnected) {
+                        el.selectionStart = start;
+                        el.selectionEnd = end;
+                    }
+                    resolve();
+                });
+            });
+        });
+    },
+
     // Plain getter — C# already has `value=` binding but during find we
     // sometimes need a fresh snapshot uncached by Blazor's render diff.
     getValue: function (selector) {
@@ -27,15 +47,32 @@ window.domBridge = {
         return el ? el.value : '';
     },
 
-    // Scroll the textarea so the current selection's first line is centred.
-    // Computes line × line-height from getComputedStyle — same math as the
-    // old _scrollToSelection helper. No business logic, just geometry on
-    // values only the DOM knows.
+    // Scroll the textarea so the current selection's first visual line is
+    // centred. When the find overlay has rendered its current <mark>, its
+    // client rect accounts for soft-wrapped lines exactly. The newline-based
+    // estimate remains as a fallback for callers without that overlay.
     scrollSelectionIntoView: function (selector) {
         var el = document.querySelector(selector);
         if (!el) return;
         var idx = el.selectionStart;
         if (typeof idx !== 'number') return;
+
+        var wrap = el.closest('.editor-mirror-wrap');
+        var mirror = wrap && wrap.querySelector('.editor-mirror');
+        var currentMark = mirror && mirror.querySelector('mark.match-current');
+        if (currentMark) {
+            var markRects = currentMark.getClientRects();
+            if (markRects.length > 0) {
+                var markRect = markRects[0];
+                var mirrorRect = mirror.getBoundingClientRect();
+                var markTop = markRect.top - mirrorRect.top + mirror.scrollTop;
+                var exactTop = markTop + markRect.height / 2 - el.clientHeight / 2;
+                var maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+                el.scrollTop = Math.max(0, Math.min(maxScroll, exactTop));
+                return;
+            }
+        }
+
         var before = el.value.substring(0, idx);
         var lineNum = (before.match(/\n/g) || []).length;
         var cs = window.getComputedStyle(el);
