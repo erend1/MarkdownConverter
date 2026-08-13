@@ -66,10 +66,10 @@ public interface IFindPresenter
     /// <summary>
     /// Re-runs <see cref="FindEngine"/> against the supplied text without
     /// changing the navigation index. Used to keep the all-match overlay
-    /// in sync when the user types into the textarea while the find bar
-    /// is open.
+    /// and visible status in sync when the user types into the textarea
+    /// while the find bar is open. Returns the refreshed typed outcome.
     /// </summary>
-    void RefreshAgainst(string text, string pattern, FindOptions options);
+    FindResult RefreshAgainst(string text, string pattern, FindOptions options);
 
     /// <summary>
     /// Locks subsequent finds to the textarea's current selection range.

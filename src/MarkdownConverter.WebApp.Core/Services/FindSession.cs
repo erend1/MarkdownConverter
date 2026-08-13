@@ -128,6 +128,27 @@ public sealed class FindSession
     }
 
     /// <summary>
+    /// Positions <see cref="CurrentIndex"/> so the next <see cref="Prev"/>
+    /// call lands on the nearest match before the supplied caret position.
+    /// If the caret is before the first match, Prev wraps to the last match.
+    /// </summary>
+    public void SeedPreviousFromCaret(int caretPosition)
+    {
+        for (var i = 0; i < Matches.Count; i++)
+        {
+            if (Matches[i].Start >= caretPosition)
+            {
+                CurrentIndex = i;
+                return;
+            }
+        }
+
+        // The caret is past every match. A one-past-the-end seed lets
+        // Prev() land on the final match without special navigation policy.
+        CurrentIndex = Matches.Count;
+    }
+
+    /// <summary>
     /// Advances <see cref="CurrentIndex"/> to the next match (wrapping at
     /// the end of the list). Returns the new position as a
     /// <see cref="FindResult"/>.

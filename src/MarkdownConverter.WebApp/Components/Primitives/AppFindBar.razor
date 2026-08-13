@@ -1,17 +1,18 @@
 @namespace MarkdownConverter.WebApp.Components.Primitives
 
 <div class="find-bar">
-    <AppTextInput CssClass="find-input"
+    <AppTextInput @ref="_findInput"
+                  CssClass="find-input"
                   Value="@_findText"
                   ValueChanged="OnFindTextChanged"
                   OnKeyDown="OnFindKeyDown"
-                  Placeholder="Find..."
-                  AutoFocus="true" />
+                  Placeholder="Find..." />
     @if (ShowReplace)
     {
         <AppTextInput CssClass="find-input"
                       Value="@_replaceText"
                       ValueChanged="OnReplaceTextChanged"
+                      OnKeyDown="OnReplaceKeyDown"
                       Placeholder="Replace..." />
         <AppButton Size="ButtonSize.Sm" OnClick="OnReplace" Title="Replace">Replace</AppButton>
         <AppButton Size="ButtonSize.Sm" OnClick="OnReplaceAll" Title="Replace All">All</AppButton>
@@ -45,5 +46,6 @@
     </AppButton>
     <span class="find-count @(_invalidRegex ? "find-count-invalid" : "")">@_matchInfo</span>
     <AppIconButton IconClass="btn btn-sm find-close"
-                   OnClick="OnCloseClicked">&times;</AppIconButton>
+                   OnClick="OnCloseClicked"
+                   Title="Close find">&times;</AppIconButton>
 </div>

@@ -182,11 +182,12 @@ window.domBridge = {
     },
 
     // Ctrl+F / Ctrl+H bridge: opens the editor's find bar. Forwarded to a
-    // [JSInvokable] (ShowFindBar) on the MarkdownEditor component.
-    attachFindShortcut: function (dotnetRef) {
-        if (window._mdFindShortcutAttached) return;
-        window._mdFindShortcutAttached = true;
-        document.addEventListener('keydown', function (e) {
+    // [JSInvokable] (ShowFindBar) on the MarkdownEditor component. The
+    // retained handler is replaced on attach and explicitly removed when the
+    // component is disposed so it cannot retain a dead .NET reference.
+    attachFindShortcut: function (dotnetRef, ownerId) {
+        window.domBridge.detachFindShortcut();
+        var handler = function (e) {
             if (!e.ctrlKey && !e.metaKey) return;
             if (e.key === 'f') {
                 e.preventDefault();
@@ -195,7 +196,18 @@ window.domBridge = {
                 e.preventDefault();
                 dotnetRef.invokeMethodAsync('ShowFindBar', true);
             }
-        });
+        };
+        window._mdFindShortcutOwnerId = ownerId;
+        window._mdFindShortcutHandler = handler;
+        document.addEventListener('keydown', handler);
+    },
+
+    detachFindShortcut: function (ownerId) {
+        if (!window._mdFindShortcutHandler) return;
+        if (ownerId && window._mdFindShortcutOwnerId !== ownerId) return;
+        document.removeEventListener('keydown', window._mdFindShortcutHandler);
+        window._mdFindShortcutHandler = null;
+        window._mdFindShortcutOwnerId = null;
     },
 
     // Called once per drag, from the splitter's @onmousedown Blazor handler.

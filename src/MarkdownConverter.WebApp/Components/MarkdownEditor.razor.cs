@@ -8,7 +8,7 @@ using MarkdownConverter.WebApp.Core.Views;
 
 namespace MarkdownConverter.WebApp.Components;
 
-public partial class MarkdownEditor : IEditorView, IDisposable
+public partial class MarkdownEditor : IEditorView, IAsyncDisposable
 {
     private const string TextareaSelector = ".editor-textarea";
     private const string MirrorSelector = ".editor-mirror";
@@ -30,6 +30,9 @@ public partial class MarkdownEditor : IEditorView, IDisposable
     // when the active tab actually changes — keystroke renders are no-ops.
     private string? _lastBoundTabId;
     private DotNetObjectReference<MarkdownEditor>? _self;
+    private readonly string _findShortcutOwnerId = Guid.NewGuid().ToString("N");
+    private bool _findShortcutAttached;
+    private bool _focusFindInputAfterRender;
 
     // Captured via @ref so OnInput can poke the find bar when the user
     // types — keeps the all-match overlay in sync without making
@@ -39,6 +42,7 @@ public partial class MarkdownEditor : IEditorView, IDisposable
     protected override void OnInitialized()
     {
         TabPresenter.AttachEditor(this);
+        FindPresenter.Reset();
         _self = DotNetObjectReference.Create(this);
     }
 
@@ -47,12 +51,15 @@ public partial class MarkdownEditor : IEditorView, IDisposable
         if (firstRender)
         {
             // Find shortcut binds at the document level — bind once.
-            await JS.InvokeVoidAsync("domBridge.attachFindShortcut", _self);
+            await JS.InvokeVoidAsync(
+                "domBridge.attachFindShortcut", _self, _findShortcutOwnerId);
+            _findShortcutAttached = true;
         }
 
         var currentTabId = TabPresenter.ActiveTab.Id;
         if (firstRender || _lastBoundTabId != currentTabId)
         {
+            var activeDocumentChanged = !firstRender && _lastBoundTabId is not null;
             _lastBoundTabId = currentTabId;
             // Textarea-scoped editing chords (Tab / Ctrl+B/I/K/`) — the JS
             // shim only does preventDefault and forwards the chord; all
@@ -66,20 +73,32 @@ public partial class MarkdownEditor : IEditorView, IDisposable
             await JS.InvokeVoidAsync("domEvents.attachDoubleClickJump", TextareaSelector, ".preview-content");
             // Highlight-overlay scroll mirroring (textarea → .editor-mirror).
             await JS.InvokeVoidAsync("domEvents.attachHighlightScrollSync", TextareaSelector, MirrorSelector);
-            // After a tab change the mirror is a new element — re-paint it
-            // with the existing find state (no-op when find bar is closed).
+            // Match ranges and selection scope belong to one document. Clear
+            // them before painting the new tab so old offsets never leak.
+            if (activeDocumentChanged && _findBar is not null)
+                await _findBar.OnActiveDocumentChangedAsync();
+
+            // After a tab change the mirror is a new element — paint only
+            // the reset/current find state.
             await RenderHighlightsAsync();
             await EditorBridge.SetScrollRatioAsync(TextareaSelector, TabPresenter.ActiveTab.ScrollRatio);
+        }
+
+        if (_focusFindInputAfterRender && _findBar is not null)
+        {
+            _focusFindInputAfterRender = false;
+            await _findBar.FocusQueryAsync();
         }
     }
 
     [JSInvokable]
-    public void ShowFindBar(bool withReplace)
-    {
-        _showFind = true;
-        _showReplace = withReplace;
-        InvokeAsync(StateHasChanged);
-    }
+    public Task ShowFindBar(bool withReplace) => InvokeAsync(() =>
+        {
+            _showFind = true;
+            _showReplace = withReplace;
+            _focusFindInputAfterRender = true;
+            StateHasChanged();
+        });
 
     /// <summary>
     /// Called by <c>dom-bridge.js</c>'s editor-key shim when it sees one
@@ -163,5 +182,24 @@ public partial class MarkdownEditor : IEditorView, IDisposable
 
     public void RequestRender() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => _self?.Dispose();
+    public async ValueTask DisposeAsync()
+    {
+        FindPresenter.Reset();
+
+        if (_findShortcutAttached)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "domBridge.detachFindShortcut", _findShortcutOwnerId);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser context is already gone; its listeners are gone
+                // with it, so there is nothing left to detach.
+            }
+        }
+
+        _self?.Dispose();
+    }
 }
