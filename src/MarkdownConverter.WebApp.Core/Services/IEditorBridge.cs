@@ -22,6 +22,13 @@ public interface IEditorBridge
     ValueTask SetSelectionAsync(string selector, int start, int end);
 
     /// <summary>
+    /// Assigns the selection after the current browser render cycle settles.
+    /// Used when a button-triggered component render would otherwise restore
+    /// the textarea's earlier caret after navigation.
+    /// </summary>
+    ValueTask SetSelectionAfterRenderAsync(string selector, int start, int end);
+
+    /// <summary>
     /// Returns the current <c>.value</c> of the matched element, bypassing
     /// any Blazor render-cycle staleness.
     /// </summary>

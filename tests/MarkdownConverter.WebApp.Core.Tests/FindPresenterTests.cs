@@ -373,6 +373,9 @@ public class FindPresenterTests
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask SetSelectionAfterRenderAsync(
+            string selector, int start, int end) => ValueTask.CompletedTask;
+
         public async ValueTask<string> GetValueAsync(string selector)
         {
             ValueReadCalls++;
@@ -437,6 +440,9 @@ public class FindPresenterTests
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask SetSelectionAfterRenderAsync(
+            string selector, int start, int end) => ValueTask.CompletedTask;
+
         public ValueTask<string> GetValueAsync(string selector)
         {
             Calls.Add("GetValue");
@@ -494,6 +500,9 @@ public class FindPresenterTests
 
         public ValueTask SetSelectionAsync(string selector, int start, int end) =>
             ValueTask.CompletedTask;
+
+        public ValueTask SetSelectionAfterRenderAsync(
+            string selector, int start, int end) => ValueTask.CompletedTask;
 
         public ValueTask<string> GetValueAsync(string selector) =>
             ValueTask.FromResult(string.Empty);
