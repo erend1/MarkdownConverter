@@ -1311,9 +1311,11 @@ textarea {
     }
 
     .toast {
-        width: min(100%, 480px);
-        max-width: none;
-        margin-left: auto;
+        /* Instead of 100%, let it size itself to the text, but never exceed the screen */
+        width: fit-content;
+        max-width: 100%;
+        margin-left: auto; /* Keeps it aligned to the right */
+        box-sizing: border-box; /* Crucial to prevent padding from breaking the bounds */
     }
 }
 
