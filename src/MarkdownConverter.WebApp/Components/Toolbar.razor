@@ -1,20 +1,28 @@
-<AppToolbarGroup>
-    <AppButton OnClick="OnNew" Title="New tab (Ctrl+N)" Icon="file-plus">New</AppButton>
+<nav class="toolbar-command-rail" aria-label="Document commands">
+    <AppToolbarGroup Label="File" CssClass="toolbar-group-file">
+        <AppButton OnClick="OnNew" Title="New tab (Ctrl+N)" Icon="file-plus">New</AppButton>
 
-    <AppButton AsLabel="true" Title="Open .md file in new tab" Icon="folder-open">
-        Open
-        <InputFile OnChange="OnFileOpen" accept=".md,.markdown,.txt" style="display:none" />
-    </AppButton>
+        <AppButton AsLabel="true"
+                   CssClass="file-upload-button"
+                   Title="Open .md file in new tab"
+                   Icon="folder-open">
+            Open
+            <InputFile OnChange="OnFileOpen"
+                       accept=".md,.markdown,.txt"
+                       class="file-input-overlay"
+                       aria-label="Open Markdown file" />
+        </AppButton>
 
-    <AppButton OnClick="OnSave" Title="Save to session (Ctrl+S)" Icon="save">Save</AppButton>
+        <AppButton OnClick="OnSave" Title="Save to session (Ctrl+S)" Icon="save">Save</AppButton>
 
-    <AppButton OnClick="OnSaveAs" Title="Download as .md (Ctrl+Shift+S)" Icon="download">Save As</AppButton>
+        <AppButton OnClick="OnSaveAs" Title="Download as .md (Ctrl+Shift+S)" Icon="download">Save As</AppButton>
+    </AppToolbarGroup>
 
-    <span class="toolbar-separator"></span>
+    <AppToolbarGroup Label="Export" CssClass="toolbar-group-export">
+        <ExportPanel />
+    </AppToolbarGroup>
 
-    <ExportPanel />
-
-    <span class="toolbar-separator"></span>
-
-    <BibliographyUpload />
-</AppToolbarGroup>
+    <AppToolbarGroup Label="References" CssClass="toolbar-group-reference">
+        <BibliographyUpload />
+    </AppToolbarGroup>
+</nav>

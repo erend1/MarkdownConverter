@@ -28,4 +28,8 @@ public partial class AppTab
 
     private static string TruncateName(string name)
         => name.Length > 20 ? name[..17] + "..." : name;
+
+    private string GetTabAriaLabel() => Tab.IsDirty
+        ? $"{Tab.FileName}, unsaved changes"
+        : Tab.FileName;
 }

@@ -7,6 +7,7 @@
                Selected="ExportPresenter.ViewModel.SelectedFormat"
                ValueBinder="@(f => f.Format.ToString())"
                DisplayBinder="@(f => f.DisplayName)"
+               AriaLabel="Export format"
                SelectionChanged="OnFormatSelected" />
 
     <AppButton Variant="ButtonVariant.Export"

@@ -10,6 +10,7 @@ public partial class AppSelect<TItem>
     [Parameter] public Func<TItem, string> DisplayBinder { get; set; } = default!;
     [Parameter] public EventCallback<TItem> SelectionChanged { get; set; }
     [Parameter] public string CssClass { get; set; } = "export-select";
+    [Parameter] public string? AriaLabel { get; set; }
 
     private async Task OnChanged(ChangeEventArgs e)
     {

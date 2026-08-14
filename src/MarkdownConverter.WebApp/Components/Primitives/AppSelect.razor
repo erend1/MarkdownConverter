@@ -1,7 +1,7 @@
 @namespace MarkdownConverter.WebApp.Components.Primitives
 @typeparam TItem
 
-<select class="@CssClass" @onchange="OnChanged">
+<select class="@CssClass" @onchange="OnChanged" aria-label="@AriaLabel">
     @foreach (var item in Items)
     {
         <option value="@ValueBinder(item)"

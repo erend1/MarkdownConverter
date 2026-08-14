@@ -7,10 +7,16 @@
         {
             <span class="editor-dirty" title="Unsaved changes">*</span>
         }
-        <span class="editor-stats">
-            Ln @TabPresenter.ActiveTab.LineCount
-            &middot; @TabPresenter.ActiveTab.WordCount words
-            &middot; @TabPresenter.ActiveTab.CharCount chars
+        <span class="editor-stats"
+              aria-label="Line @TabPresenter.ActiveTab.LineCount, @TabPresenter.ActiveTab.WordCount words, @TabPresenter.ActiveTab.CharCount characters">
+            <span aria-hidden="true">Ln @TabPresenter.ActiveTab.LineCount</span>
+            <span class="editor-stat-words" aria-hidden="true">
+                <span class="editor-stat-wide">&middot; @TabPresenter.ActiveTab.WordCount words</span>
+                <span class="editor-stat-compact">&middot; @TabPresenter.ActiveTab.WordCount wd</span>
+            </span>
+            <span class="editor-stat-characters" aria-hidden="true">
+                &middot; @TabPresenter.ActiveTab.CharCount chars
+            </span>
         </span>
     </div>
 
@@ -32,6 +38,7 @@
                   @ondrop:preventDefault="true"
                   @ondrop="OnDrop"
                   value="@TabPresenter.ActiveTab.MarkdownText"
+                  aria-label="Markdown source"
                   placeholder="Start writing Markdown here..."
                   spellcheck="false"></textarea>
     </div>

@@ -1,4 +1,9 @@
-<button class="btn btn-theme" @onclick="OnToggle" title="Toggle dark/light mode">
-    <i class="icon icon-sm @(IsDark ? "lucide-sun" : "lucide-moon")"></i>
+<button type="button"
+        class="btn btn-theme"
+        @onclick="OnToggle"
+        title="Toggle dark/light mode"
+        aria-label="Dark theme"
+        aria-pressed="@IsDark">
+    <i class="icon icon-sm @(IsDark ? "lucide-sun" : "lucide-moon")" aria-hidden="true"></i>
     @(IsDark ? "Light" : "Dark")
 </button>

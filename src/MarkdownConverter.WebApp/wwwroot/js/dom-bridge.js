@@ -182,10 +182,7 @@ window.domBridge = {
     // to a [JSInvokable] on the C# side. Idempotent — re-attaching removes
     // the previous pair.
     attachDragDrop: function (dotnetRef) {
-        if (window._mdDragOver) {
-            document.removeEventListener('dragover', window._mdDragOver);
-            document.removeEventListener('drop', window._mdDrop);
-        }
+        window.domBridge.detachDragDrop();
         var over = function (e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -210,6 +207,15 @@ window.domBridge = {
         window._mdDrop = drop;
         document.addEventListener('dragover', over);
         document.addEventListener('drop', drop);
+    },
+
+    detachDragDrop: function () {
+        if (window._mdDragOver)
+            document.removeEventListener('dragover', window._mdDragOver);
+        if (window._mdDrop)
+            document.removeEventListener('drop', window._mdDrop);
+        window._mdDragOver = null;
+        window._mdDrop = null;
     },
 
     // Data-driven global shortcuts. C# supplies an array of
@@ -263,28 +269,117 @@ window.domBridge = {
         window._mdFindShortcutOwnerId = null;
     },
 
-    // Called once per drag, from the splitter's @onmousedown Blazor handler.
-    // Forwards each subsequent mousemove (clientX + container geometry) up
-    // to C# for the percentage math, then self-cleans on mouseup. No
-    // resize logic lives here — only event glue.
-    startSplitterDrag: function (dotnetRef) {
+    // Pointer capture and document-level delivery are browser-native. The
+    // adapter throttles move delivery to one C# call per animation frame;
+    // C# remains the owner of percentage math, clamping, keyboard policy and
+    // the tap-to-reset decision. Every temporary listener is removed at the
+    // end of the gesture or explicitly during component disposal.
+    startSplitterDrag: function (dotnetRef, pointerId, startX, startY) {
+        window.domBridge.cancelSplitterDrag();
+
         var container = document.querySelector('.editor-layout');
-        if (!container) return;
+        var splitter = document.querySelector('.splitter');
+        if (!container || !splitter) return;
+
+        var moved = false;
+        var pendingEvent = null;
+        var animationFrame = 0;
+        var invocation = Promise.resolve();
+
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        var move = function (e) {
+
+        try {
+            splitter.setPointerCapture(pointerId);
+        } catch {
+            // Document-level listeners below still provide safe delivery on
+            // engines that reject late pointer capture.
+        }
+
+        var sendPosition = function (event) {
             var rect = container.getBoundingClientRect();
-            dotnetRef.invokeMethodAsync('OnSplitterDrag',
-                e.clientX, rect.left, rect.width);
+            invocation = invocation
+                .then(function () {
+                    return dotnetRef.invokeMethodAsync(
+                        'OnSplitterDrag', event.clientX, rect.left, rect.width);
+                })
+                .catch(function () {
+                    // Component/browser teardown owns cancellation; a late
+                    // move must not become an unhandled browser rejection.
+                });
         };
-        var end = function () {
-            document.removeEventListener('mousemove', move);
-            document.removeEventListener('mouseup', end);
+
+        var flushMove = function () {
+            animationFrame = 0;
+            if (!pendingEvent) return;
+            var event = pendingEvent;
+            pendingEvent = null;
+            sendPosition(event);
+        };
+
+        var move = function (e) {
+            if (e.pointerId !== pointerId) return;
+            e.preventDefault();
+
+            if (!moved) {
+                moved = Math.abs(e.clientX - startX) >= 3
+                    || Math.abs(e.clientY - startY) >= 3;
+            }
+            if (!moved) return;
+
+            pendingEvent = e;
+            if (!animationFrame)
+                animationFrame = requestAnimationFrame(flushMove);
+        };
+
+        var cleanup = function () {
+            document.removeEventListener('pointermove', move);
+            document.removeEventListener('pointerup', end);
+            document.removeEventListener('pointercancel', cancel);
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+            pendingEvent = null;
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            dotnetRef.invokeMethodAsync('OnSplitterEnd');
+
+            try {
+                if (splitter.hasPointerCapture(pointerId))
+                    splitter.releasePointerCapture(pointerId);
+            } catch {
+            }
+
+            if (window._mdSplitterDragCleanup === cleanup)
+                window._mdSplitterDragCleanup = null;
         };
-        document.addEventListener('mousemove', move);
-        document.addEventListener('mouseup', end);
+
+        var finish = function (e, cancelled) {
+            if (e.pointerId !== pointerId) return;
+            e.preventDefault();
+
+            if (moved && !cancelled)
+                sendPosition(e);
+
+            cleanup();
+            invocation
+                .then(function () {
+                    return dotnetRef.invokeMethodAsync(
+                        'OnSplitterEnd', cancelled || moved);
+                })
+                .catch(function () {
+                });
+        };
+
+        var end = function (e) { finish(e, false); };
+        var cancel = function (e) { finish(e, true); };
+
+        window._mdSplitterDragCleanup = cleanup;
+        document.addEventListener('pointermove', move, { passive: false });
+        document.addEventListener('pointerup', end, { passive: false });
+        document.addEventListener('pointercancel', cancel, { passive: false });
+    },
+
+    cancelSplitterDrag: function () {
+        if (window._mdSplitterDragCleanup)
+            window._mdSplitterDragCleanup();
     }
 };

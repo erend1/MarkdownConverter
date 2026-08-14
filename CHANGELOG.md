@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Added the responsive Ink & Paper workspace with wide split panes, compact Source/Preview switching, pointer and keyboard resizing, touch-sized controls, dynamic viewport handling, and shared Web/Desktop rendering.
+
 ### Fixed
 
 - Restored reliable Ctrl/Cmd+F and Ctrl/Cmd+H focus, explicit-range find navigation, strict replace-current behavior, scoped-search cleanup, native-undo replacement, and shortcut listener disposal in the shared WebApp editor.

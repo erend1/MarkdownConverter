@@ -6,6 +6,7 @@
                   Value="@_findText"
                   ValueChanged="OnFindTextChanged"
                   OnKeyDown="OnFindKeyDown"
+                  AriaLabel="Find query"
                   Placeholder="Find..." />
     @if (ShowReplace)
     {
@@ -13,6 +14,7 @@
                       Value="@_replaceText"
                       ValueChanged="OnReplaceTextChanged"
                       OnKeyDown="OnReplaceKeyDown"
+                      AriaLabel="Replacement text"
                       Placeholder="Replace..." />
         <AppButton Size="ButtonSize.Sm"
                    OnClick="OnReplace"

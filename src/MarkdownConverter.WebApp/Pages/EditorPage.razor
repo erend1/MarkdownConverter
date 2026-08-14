@@ -1,13 +1,55 @@
 @page "/"
-@implements IDisposable
+@implements IAsyncDisposable
 
-<div class="editor-layout">
-    <div class="editor-pane" id="editor-pane" style="@LeftPaneStyle">
+<div class="workspace-shell">
+    <div class="workspace-document-strip">
         <TabBar />
-        <MarkdownEditor />
+        <div class="workspace-view-switch"
+             role="group"
+             aria-label="Workspace view">
+            <button type="button"
+                    class="@GetPaneButtonClass(WorkspacePane.Source)"
+                    aria-pressed="@IsPaneSelected(WorkspacePane.Source)"
+                    @onclick="@(() => SelectPaneAsync(WorkspacePane.Source))">
+                Source
+            </button>
+            <button type="button"
+                    class="@GetPaneButtonClass(WorkspacePane.Preview)"
+                    aria-pressed="@IsPaneSelected(WorkspacePane.Preview)"
+                    @onclick="@(() => SelectPaneAsync(WorkspacePane.Preview))">
+                Preview
+            </button>
+        </div>
     </div>
-    <div class="splitter" id="splitter" @onmousedown="OnSplitterMouseDown"></div>
-    <div class="preview-pane" id="preview-pane" style="@RightPaneStyle">
-        <HtmlPreview />
+
+    <div class="@WorkspaceCssClass" style="@WorkspaceStyle">
+        <section class="workspace-pane workspace-pane-source editor-pane"
+                 id="editor-pane"
+                 aria-label="Markdown source editor">
+            <MarkdownEditor />
+        </section>
+
+        <div class="splitter"
+             id="splitter"
+             role="separator"
+             aria-label="Resize source and preview panes"
+             aria-orientation="vertical"
+             aria-valuemin="20"
+             aria-valuemax="80"
+             aria-valuenow="@SplitAriaValue"
+             aria-valuetext="@SplitAriaValueText"
+             tabindex="0"
+             title="Drag to resize; use arrow keys; press Home, Enter, or Space to reset equally"
+             @onpointerdown="OnSplitterPointerDown"
+             @onpointerdown:preventDefault="true"
+             @onkeydown="OnSplitterKeyDown">
+            <span class="splitter-grip" aria-hidden="true"></span>
+        </div>
+
+        <section class="workspace-pane workspace-pane-preview preview-pane"
+                 id="preview-pane"
+                 aria-label="Rendered Markdown preview">
+            <HtmlPreview />
+        </section>
     </div>
 </div>

@@ -1,34 +1,39 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using MarkdownConverter.WebApp.Core.Presenters;
 using MarkdownConverter.WebApp.Core.Services;
+using MarkdownConverter.WebApp.Core.ViewModels;
 
 namespace MarkdownConverter.WebApp.Pages;
 
-public partial class EditorPage : IDisposable
+public partial class EditorPage : IAsyncDisposable
 {
     [Inject] private ITabPresenter TabPresenter { get; set; } = default!;
     [Inject] private IBibliographyPresenter BibPresenter { get; set; } = default!;
     [Inject] private IToastService ToastService { get; set; } = default!;
     [Inject] private IDesktopCapabilityProvider DesktopCapabilityProvider { get; set; } = default!;
+    [Inject] private IEditorBridge EditorBridge { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private DotNetObjectReference<EditorPage>? _dotNetRef;
     private CancellationTokenSource? _pendingFilePollCts;
 
-    // Splitter geometry — kept as a percentage so the layout scales when
-    // the window is resized. Default 50/50, clamped 20..80 to mirror the
-    // limits the old JS splitter enforced.
-    private const double MinPct = 20.0;
-    private const double MaxPct = 80.0;
-    private double _leftPct = 50.0;
+    private readonly WorkspaceLayoutState _workspace = new();
+    private bool _focusSourceAfterRender;
 
-    private string LeftPaneStyle =>
-        FormattableString.Invariant($"flex: none; width: {_leftPct:0.##}%;");
-    private string RightPaneStyle =>
-        FormattableString.Invariant($"flex: none; width: {100 - _leftPct:0.##}%;");
+    private string WorkspaceCssClass => _workspace.SelectedPane == WorkspacePane.Source
+        ? "editor-layout workspace-source-selected"
+        : "editor-layout workspace-preview-selected";
+
+    private string WorkspaceStyle => FormattableString.Invariant(
+        $"--source-pane-percentage: {_workspace.SourcePanePercentage:0.##}%;");
+
+    private string SplitAriaValue => FormattableString.Invariant(
+        $"{_workspace.SourcePanePercentage:0.##}");
+
+    private string SplitAriaValueText => FormattableString.Invariant(
+        $"Source {_workspace.SourcePanePercentage:0.##}%, preview {_workspace.PreviewPanePercentage:0.##}%");
 
     protected override void OnInitialized()
     {
@@ -70,6 +75,12 @@ public partial class EditorPage : IDisposable
                 await TryOpenPendingFilesAsync();
                 StartPendingFilePolling();
             }
+        }
+
+        if (_focusSourceAfterRender)
+        {
+            _focusSourceAfterRender = false;
+            await EditorBridge.FocusAsync(".editor-textarea");
         }
     }
 
@@ -138,19 +149,31 @@ public partial class EditorPage : IDisposable
         await BibPresenter.OnBibFileUploadedAsync(fileName, content);
     }
 
-    // ---- Splitter -----------------------------------------------------
-    //
-    // The splitter element is a Blazor <div> with @onmousedown — the start
-    // gesture is handled natively. While dragging, dom-bridge.js attaches
-    // a temporary mousemove/mouseup pair at document level and forwards
-    // each clientX up to OnSplitterDrag below; the percentage math + clamp
-    // live in C# (a single multiply, a divide, a Clamp). Mouseup cleans
-    // up the listeners and calls OnSplitterEnd.
+    private bool IsPaneSelected(WorkspacePane pane) => _workspace.SelectedPane == pane;
 
-    private async Task OnSplitterMouseDown(MouseEventArgs _)
+    private string GetPaneButtonClass(WorkspacePane pane) => IsPaneSelected(pane)
+        ? "workspace-view-button workspace-view-button-selected"
+        : "workspace-view-button";
+
+    private async Task SelectPaneAsync(WorkspacePane pane)
     {
-        if (_dotNetRef is null) return;
-        await JS.InvokeVoidAsync("domBridge.startSplitterDrag", _dotNetRef);
+        _workspace.SelectPane(pane);
+        _focusSourceAfterRender = pane == WorkspacePane.Source;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Pointer capture and document-level move delivery are browser mechanics;
+    // percentage ownership, clamping, keyboard policy, and reset behavior stay
+    // in this C# component and its plain WorkspaceLayoutState.
+    private async Task OnSplitterPointerDown(PointerEventArgs e)
+    {
+        if (_dotNetRef is null || e.Button != 0) return;
+        await JS.InvokeVoidAsync(
+            "domBridge.startSplitterDrag",
+            _dotNetRef,
+            e.PointerId,
+            e.ClientX,
+            e.ClientY);
     }
 
     [JSInvokable]
@@ -158,22 +181,53 @@ public partial class EditorPage : IDisposable
     {
         if (containerWidth <= 0) return;
         var pct = (clientX - containerLeft) / containerWidth * 100.0;
-        _leftPct = Math.Clamp(pct, MinPct, MaxPct);
+        _workspace.SetSourcePanePercentage(pct);
         StateHasChanged();
     }
 
     [JSInvokable]
-    public void OnSplitterEnd()
+    public void OnSplitterEnd(bool moved)
     {
-        // No-op for now — the drag listeners self-clean on mouseup inside
-        // dom-bridge. Hook left here so the JS shim has a known endpoint.
+        if (!moved)
+        {
+            _workspace.ResetSplit();
+            StateHasChanged();
+        }
     }
 
-    public void Dispose()
+    private void OnSplitterKeyDown(KeyboardEventArgs e)
+    {
+        var step = e.ShiftKey ? 10.0 : 2.0;
+
+        if (e.Key is "ArrowLeft" or "ArrowDown")
+            _workspace.SetSourcePanePercentage(_workspace.SourcePanePercentage - step);
+        else if (e.Key is "ArrowRight" or "ArrowUp")
+            _workspace.SetSourcePanePercentage(_workspace.SourcePanePercentage + step);
+        else if (e.Key is "Home" or "Enter" or " " or "0")
+            _workspace.ResetSplit();
+        else
+            return;
+
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
     {
         _pendingFilePollCts?.Cancel();
         _pendingFilePollCts?.Dispose();
         TabPresenter.AutoSaveFailed -= OnAutoSaveFailed;
+
+        try
+        {
+            await JS.InvokeVoidAsync("domBridge.detachDragDrop");
+            await JS.InvokeVoidAsync("domBridge.cancelSplitterDrag");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser context is already gone, so temporary pointer
+            // listeners disappeared with it.
+        }
+
         _dotNetRef?.Dispose();
     }
 }

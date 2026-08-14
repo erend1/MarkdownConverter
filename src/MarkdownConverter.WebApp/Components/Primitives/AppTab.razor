@@ -2,7 +2,6 @@
 @using MarkdownConverter.WebApp.Core.ViewModels
 
 <div class="tab @(IsActive ? "tab-active" : "") @(IsDragOver ? "tab-drag-over" : "")"
-     @onclick="OnClick"
      draggable="true"
      @ondragstart="OnDragStart"
      @ondragover:preventDefault="true"
@@ -10,8 +9,7 @@
      @ondragleave="OnDragLeave"
      @ondrop:preventDefault="true"
      @ondrop="OnDrop"
-     @ondragend="OnDragEnd"
-     title="@Tab.FileName">
+     @ondragend="OnDragEnd">
     @if (IsRenaming)
     {
         <AppTextInput CssClass="tab-rename-input"
@@ -20,24 +18,31 @@
                       OnBlur="OnRenameBlur"
                       OnKeyDown="OnRenameKeyDown"
                       StopClickPropagation="true"
+                      AriaLabel="Rename document"
                       AutoFocus="true" />
     }
     else
     {
-        <span class="tab-name"
-              @ondblclick:stopPropagation="true"
-              @ondblclick="OnStartRename">@TruncateName(Tab.FileName)</span>
-    }
-    @if (Tab.IsDirty)
-    {
-        <span class="tab-dirty">&bull;</span>
-    }
-    @if (!IsRenaming)
-    {
+        <button type="button"
+                class="tab-select"
+                role="tab"
+                aria-selected="@IsActive"
+                aria-label="@GetTabAriaLabel()"
+                title="@Tab.FileName"
+                @onclick="OnClick"
+                @ondblclick:stopPropagation="true"
+                @ondblclick="OnStartRename">
+            <span class="tab-name">@TruncateName(Tab.FileName)</span>
+            @if (Tab.IsDirty)
+            {
+                <span class="tab-dirty" aria-hidden="true">&bull;</span>
+            }
+        </button>
+
         <AppIconButton IconClass="tab-rename"
                        LucideIcon="pencil"
                        OnClick="OnStartRename"
-                       Title="Rename tab (double-click)" />
+                       Title="Rename tab" />
     }
     <AppIconButton IconClass="tab-close"
                    OnClick="OnClose"
