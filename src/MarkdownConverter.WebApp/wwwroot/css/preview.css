@@ -4,6 +4,7 @@
     font-size: 15px;
     line-height: 1.6;
     word-wrap: break-word;
+    overflow-wrap: anywhere;
     color: var(--text-primary);
 }
 
@@ -24,8 +25,10 @@
 }
 
 .markdown-body pre {
+    max-width: 100%;
     padding: 16px;
     overflow: auto;
+    overscroll-behavior-inline: contain;
     font-size: 85%;
     line-height: 1.45;
     background: var(--bg-secondary);
@@ -48,6 +51,10 @@
 }
 
 .markdown-body table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
     border-collapse: collapse;
     width: 100%;
     margin-bottom: 16px;
@@ -97,6 +104,10 @@
 .markdown-body .math-display {
     text-align: center;
     margin: 1em 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
 }
 
 /* Inline math — no extra margin */

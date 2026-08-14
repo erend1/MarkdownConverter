@@ -2,25 +2,29 @@
 @using MarkdownConverter.WebApp.Core.Models
 
 <div class="export-panel">
-    <AppSelect TItem="ExportOption"
-               Items="ExportPresenter.ViewModel.AvailableFormats"
-               Selected="ExportPresenter.ViewModel.SelectedFormat"
-               ValueBinder="@(f => f.Format.ToString())"
-               DisplayBinder="@(f => f.DisplayName)"
-               SelectionChanged="OnFormatSelected" />
+    <div class="export-primary-action">
+        <AppSelect TItem="ExportOption"
+                   Items="ExportPresenter.ViewModel.AvailableFormats"
+                   Selected="ExportPresenter.ViewModel.SelectedFormat"
+                   ValueBinder="@(f => f.Format.ToString())"
+                   DisplayBinder="@(f => f.DisplayName)"
+                   AriaLabel="Export format"
+                   SelectionChanged="OnFormatSelected" />
 
-    <AppButton Variant="ButtonVariant.Export"
-               OnClick="OnExport"
-               Disabled="ExportPresenter.ViewModel.IsExporting">
-        @if (ExportPresenter.ViewModel.IsExporting)
-        {
-            <span>Exporting...</span>
-        }
-        else
-        {
-            <span>Export</span>
-        }
-    </AppButton>
+        <AppButton Variant="ButtonVariant.Export"
+                   Icon="download"
+                   OnClick="OnExport"
+                   Disabled="ExportPresenter.ViewModel.IsExporting">
+            @if (ExportPresenter.ViewModel.IsExporting)
+            {
+                <span>Exporting...</span>
+            }
+            else
+            {
+                <span>Export</span>
+            }
+        </AppButton>
+    </div>
 
     <AppButton Variant="ButtonVariant.Pdf"
                OnClick="OnPrintPdf"

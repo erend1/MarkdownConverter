@@ -10,6 +10,7 @@ public partial class AppTextInput
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
     [Parameter] public string CssClass { get; set; } = string.Empty;
     [Parameter] public bool AutoFocus { get; set; }
     [Parameter] public bool StopClickPropagation { get; set; }
@@ -18,6 +19,14 @@ public partial class AppTextInput
 
     private Task OnInput(ChangeEventArgs e)
         => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && AutoFocus)
+        {
+            await FocusAsync();
+        }
+    }
 
     /// <summary>
     /// Explicitly focuses the rendered input after its owning component has

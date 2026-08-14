@@ -100,6 +100,8 @@ public partial class MarkdownEditor : IEditorView, IAsyncDisposable
             StateHasChanged();
         });
 
+    private Task OpenFindBar() => ShowFindBar(withReplace: false);
+
     /// <summary>
     /// Called by <c>dom-bridge.js</c>'s editor-key shim when it sees one
     /// of our textarea-scoped chords. The shim has already called

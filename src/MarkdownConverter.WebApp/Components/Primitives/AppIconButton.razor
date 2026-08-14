@@ -3,10 +3,11 @@
 <button type="button" class="@IconClass"
         @onclick="OnClick"
         @onclick:stopPropagation="StopPropagation"
-        title="@Title">
+        title="@Title"
+        aria-label="@Title">
     @if (!string.IsNullOrEmpty(LucideIcon))
     {
-        <i class="icon icon-sm lucide-@LucideIcon"></i>
+        <i class="icon icon-sm lucide-@LucideIcon" aria-hidden="true"></i>
     }
     else
     {

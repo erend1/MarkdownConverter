@@ -1,9 +1,12 @@
 @inherits LayoutComponentBase
 
 <div class="app-container @(_isDark ? "dark" : "light")">
-    <header class="app-toolbar">
+    <header class="app-toolbar" aria-label="Application toolbar">
         <div class="toolbar-left">
-            <span class="app-logo">MD Converter</span>
+            <div class="app-brand">
+                <span class="app-logo">MD Converter</span>
+                <span class="app-tagline">Ink &amp; Paper</span>
+            </div>
         </div>
         <div class="toolbar-center">
             <Toolbar />

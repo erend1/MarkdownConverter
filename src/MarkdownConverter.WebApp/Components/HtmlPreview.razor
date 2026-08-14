@@ -8,7 +8,13 @@
             <span class="preview-loading">rendering...</span>
         }
     </div>
-    <div id="preview-content" class="preview-content markdown-body">
-        @((MarkupString)Presenter.ViewModel.HtmlContent)
+    <div id="preview-content"
+         class="preview-content"
+         role="region"
+         aria-label="Rendered Markdown"
+         tabindex="0">
+        <article class="preview-paper markdown-body">
+            @((MarkupString)Presenter.ViewModel.HtmlContent)
+        </article>
     </div>
 </div>

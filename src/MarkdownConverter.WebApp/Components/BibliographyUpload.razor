@@ -6,13 +6,21 @@
         <span class="bib-info" title="@Presenter.ViewModel.BibFileName">
             Bib: @Presenter.ViewModel.EntryCount entries
         </span>
-        <button class="btn btn-sm" @onclick="OnClear" title="Remove bibliography">x</button>
+        <button type="button"
+                class="btn btn-sm"
+                @onclick="OnClear"
+                title="Remove bibliography"
+                aria-label="Remove bibliography">x</button>
     }
     else
     {
-        <label class="btn btn-sm btn-bib" title="Upload .bib bibliography file">
+        <label class="btn btn-sm btn-bib file-upload-button"
+               title="Upload .bib bibliography file">
             .bib
-            <InputFile OnChange="OnFileSelected" accept=".bib" style="display:none" />
+            <InputFile OnChange="OnFileSelected"
+                       accept=".bib"
+                       class="file-input-overlay"
+                       aria-label="Upload bibliography file" />
         </label>
     }
 </div>

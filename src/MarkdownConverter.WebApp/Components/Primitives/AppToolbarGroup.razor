@@ -1,10 +1,20 @@
 @namespace MarkdownConverter.WebApp.Components.Primitives
 
-<div class="toolbar-actions">
-    @ChildContent
+<div class="toolbar-command-group @CssClass"
+     role="group"
+     aria-label="@Label">
+    <div class="toolbar-group-controls">
+        @ChildContent
+    </div>
 </div>
 
 @code {
     [Microsoft.AspNetCore.Components.Parameter]
     public Microsoft.AspNetCore.Components.RenderFragment? ChildContent { get; set; }
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public string? CssClass { get; set; }
 }

@@ -10,6 +10,7 @@ public partial class AppButton
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
     [Parameter] public string? Title { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
     [Parameter] public string? Icon { get; set; }
     [Parameter] public ButtonVariant Variant { get; set; } = ButtonVariant.Default;
     [Parameter] public ButtonSize Size { get; set; } = ButtonSize.Default;

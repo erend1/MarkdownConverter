@@ -1,7 +1,7 @@
 @implements MarkdownConverter.WebApp.Core.Views.ITabView
 
 <div class="tab-bar">
-    <div class="tab-list">
+    <div class="tab-list" role="tablist" aria-label="Open documents">
         @for (int i = 0; i < TabPresenter.Tabs.Count; i++)
         {
             var idx = i;
@@ -10,7 +10,7 @@
                     IsActive="idx == TabPresenter.ActiveIndex"
                     IsDragOver="_dragOverIndex == idx"
                     IsRenaming="_renamingIndex == idx"
-                    RenameText="_renameText"
+                    RenameText="@_renameText"
                     RenameTextChanged="@(v => _renameText = v)"
                     OnClick="@(() => SwitchToAsync(idx))"
                     OnDragStart="@(() => OnDragStart(idx))"
