@@ -81,7 +81,7 @@ public class ResponsiveWorkspaceAssetContractTests
     }
 
     [Fact]
-    public void CompactEditor_ExposesFindThroughTheExistingEditorCommandPath()
+    public void Editor_ExposesFindThroughTheExistingCommandPathAtEveryWidth()
     {
         var editor = ReadRepositoryFile(
             "src", "MarkdownConverter.WebApp", "Components", "MarkdownEditor.razor");
@@ -96,8 +96,9 @@ public class ResponsiveWorkspaceAssetContractTests
         Assert.Contains("aria-expanded=\"@(_showFind ? \"true\" : \"false\")\"", editor);
         Assert.Contains("Id=\"editor-find-bar\"", editor);
         Assert.Contains("OpenFindBar() => ShowFindBar(withReplace: false)", editorCode);
-        Assert.Contains(".editor-find-button", css);
-        Assert.Contains("@media (max-width: 899.98px)", css);
+        var normalizedCss = css.ReplaceLineEndings("\n");
+        Assert.Contains(".editor-find-button {\n    display: inline-flex;", normalizedCss);
+        Assert.DoesNotContain(".editor-find-button {\n    display: none;", normalizedCss);
     }
 
     [Fact]

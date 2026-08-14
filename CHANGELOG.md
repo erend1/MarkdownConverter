@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Added the responsive Ink & Paper workspace with wide split panes, compact Source/Preview switching, pointer and keyboard resizing, a streamlined command bar, touch-sized controls with compact Find access, dynamic viewport handling, and shared Web/Desktop rendering.
+- Added the responsive Ink & Paper workspace with wide split panes, compact Source/Preview switching, pointer and keyboard resizing, a streamlined command bar, visible Find access at every width with touch-sized controls, dynamic viewport handling, and shared Web/Desktop rendering.
 
 ### Fixed
 
