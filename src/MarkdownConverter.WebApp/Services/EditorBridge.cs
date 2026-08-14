@@ -22,14 +22,11 @@ public sealed class EditorBridge : IEditorBridge
     public ValueTask SetSelectionAsync(string selector, int start, int end) =>
         _js.InvokeVoidAsync("domBridge.setSelection", selector, start, end);
 
-    public ValueTask SetSelectionAfterRenderAsync(string selector, int start, int end) =>
-        _js.InvokeVoidAsync("domBridge.setSelectionAfterRender", selector, start, end);
-
     public ValueTask<string> GetValueAsync(string selector) =>
         _js.InvokeAsync<string>("domBridge.getValue", selector);
 
-    public ValueTask ScrollSelectionIntoViewAsync(string selector) =>
-        _js.InvokeVoidAsync("domBridge.scrollSelectionIntoView", selector);
+    public ValueTask RevealSelectionAsync(string selector, int start, int end) =>
+        _js.InvokeVoidAsync("domBridge.revealSelection", selector, start, end);
 
     public ValueTask<double> GetScrollRatioAsync(string selector) =>
         _js.InvokeAsync<double>("domBridge.getScrollRatio", selector);

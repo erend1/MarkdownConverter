@@ -9,9 +9,8 @@ public sealed record FindReplaceResult
     public FindFailure Failure { get; init; }
 
     /// <summary>
-    /// Navigation outcome when Replace did not modify the current selection
-    /// and instead moved to the next match. Null when a replacement was
-    /// applied or the operation failed before navigation.
+    /// Retained for compatibility with the former replace-or-navigate
+    /// contract. Strict replace-current operations always leave this null.
     /// </summary>
     public FindResult? Navigation { get; init; }
 

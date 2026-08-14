@@ -22,11 +22,16 @@ public interface IFindPresenter
     Task<FindResult> PrevAsync(string selector, string pattern, FindOptions options);
 
     /// <summary>
-    /// If the textarea's current selection is itself a match, replaces it
-    /// with <paramref name="replacement"/> while preserving the browser's
-    /// native undo stack. Otherwise navigates to the next match without
-    /// replacing.
-    /// Returns a typed replacement outcome.
+    /// Replaces the current C#-owned match with <paramref name="replacement"/>
+    /// while preserving the browser's native undo stack. Does not navigate
+    /// when no current match exists.
+    /// </summary>
+    Task<FindReplaceResult> ReplaceCurrentAsync(
+        string selector, string pattern, string replacement, FindOptions options);
+
+    /// <summary>
+    /// Compatibility alias for <see cref="ReplaceCurrentAsync"/>. Despite the
+    /// historical name, this operation no longer navigates.
     /// </summary>
     Task<FindReplaceResult> ReplaceNextAsync(
         string selector, string pattern, string replacement, FindOptions options);

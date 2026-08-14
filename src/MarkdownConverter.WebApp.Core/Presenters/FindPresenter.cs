@@ -83,24 +83,26 @@ public sealed class FindPresenter : IFindPresenter
         if (_session.Current is { } match)
         {
             if (!IsCurrent(generation)) return FindResult.Stale;
-            await _bridge.SetSelectionAsync(selector, match.Start, match.End);
-            if (!IsCurrent(generation)) return FindResult.Stale;
-            await _bridge.ScrollSelectionIntoViewAsync(selector);
+            await _bridge.RevealSelectionAsync(selector, match.Start, match.End);
             if (!IsCurrent(generation)) return FindResult.Stale;
         }
 
         return result;
     }
 
-    public async Task<FindReplaceResult> ReplaceNextAsync(
+    public async Task<FindReplaceResult> ReplaceCurrentAsync(
         string selector, string pattern, string replacement, FindOptions options)
         => await RunOperationAsync(
             BeginQueryOperation(pattern, options),
-            generation => ReplaceNextCoreAsync(
+            generation => ReplaceCurrentCoreAsync(
                 selector, pattern, replacement, options, generation),
             FindReplaceResult.Stale);
 
-    private async Task<FindReplaceResult> ReplaceNextCoreAsync(
+    public Task<FindReplaceResult> ReplaceNextAsync(
+        string selector, string pattern, string replacement, FindOptions options)
+        => ReplaceCurrentAsync(selector, pattern, replacement, options);
+
+    private async Task<FindReplaceResult> ReplaceCurrentCoreAsync(
         string selector,
         string pattern,
         string replacement,
@@ -109,81 +111,25 @@ public sealed class FindPresenter : IFindPresenter
     {
         if (string.IsNullOrEmpty(pattern)) return new FindReplaceResult();
 
-        // Verify the pattern compiles before touching the DOM, and reuse
-        // the engine for the "is current selection a match?" check below.
-        try
-        {
-            _engine.FindAll(string.Empty, pattern, options);
-        }
-        catch (FindPatternException)
-        {
-            return new FindReplaceResult { Failure = FindFailure.InvalidPattern };
-        }
-        catch (FindTimeoutException)
-        {
-            return new FindReplaceResult { Failure = FindFailure.TimedOut };
-        }
-
         var text = await _bridge.GetValueAsync(selector);
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
         ValidateScopeForText(text);
-        var selection = await _bridge.GetSelectionAsync(selector);
+        _session.EnsureUpToDate(text, pattern, options, _scopeStart, _scopeEnd);
+        if (_session.Failure != FindFailure.None)
+            return new FindReplaceResult { Failure = _session.Failure };
+        if (_session.Current is not { } match) return new FindReplaceResult();
+
+        // The presenter's session is the source of truth. Reapply its current
+        // range immediately before the native-undo edit instead of trusting a
+        // DOM selection that a browser/render cycle may have collapsed.
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
-        if (selection.End <= selection.Start)
-        {
-            // No selection on the textarea — fall through to plain navigate.
-            var navigation = await NavigateAsync(
-                selector, pattern, options, forward: true, generation);
-            return new FindReplaceResult
-            {
-                Failure = navigation.Failure,
-                IsStale = navigation.IsStale,
-                Navigation = navigation
-            };
-        }
-
-        // Is the user's current selection itself a match?
-        var selected = text.Substring(selection.Start, selection.End - selection.Start);
-        IReadOnlyList<TextMatch> matchesAtSelection;
-        try
-        {
-            matchesAtSelection = _engine.FindAll(selected, pattern, options);
-        }
-        catch (FindPatternException)
-        {
-            return new FindReplaceResult { Failure = FindFailure.InvalidPattern };
-        }
-        catch (FindTimeoutException)
-        {
-            return new FindReplaceResult { Failure = FindFailure.TimedOut };
-        }
-        var isWithinScope = !HasScope
-            || (selection.Start >= _scopeStart && selection.End <= _scopeEnd);
-        var isExactMatch = isWithinScope
-            && matchesAtSelection.Count == 1
-            && matchesAtSelection[0].Start == 0
-            && matchesAtSelection[0].End == selected.Length;
-
-        if (isExactMatch)
-        {
-            // execCommand insertText edits the textarea while keeping the
-            // browser's undo stack — better than overwriting el.value.
-            if (!IsCurrent(generation)) return FindReplaceResult.Stale;
-            await _bridge.InsertTextAtCursorAsync(selector, replacement);
-            ResetAfterDocumentEdit();
-            return IsCurrent(generation)
-                ? new FindReplaceResult { Count = 1 }
-                : FindReplaceResult.Stale;
-        }
-
-        // Selection isn't a match — just navigate so the user can decide.
-        var result = await NavigateAsync(selector, pattern, options, forward: true, generation);
-        return new FindReplaceResult
-        {
-            Failure = result.Failure,
-            IsStale = result.IsStale,
-            Navigation = result
-        };
+        await _bridge.SetSelectionAsync(selector, match.Start, match.End);
+        if (!IsCurrent(generation)) return FindReplaceResult.Stale;
+        await _bridge.InsertTextAtCursorAsync(selector, replacement);
+        ResetAfterDocumentEdit();
+        return IsCurrent(generation)
+            ? new FindReplaceResult { Count = 1 }
+            : FindReplaceResult.Stale;
     }
 
     public async Task<FindReplaceResult> ReplaceAllAsync(

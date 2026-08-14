@@ -20,26 +20,6 @@ window.domBridge = {
         el.selectionEnd = end;
     },
 
-    // A button-triggered Blazor render can restore the textarea's previous
-    // caret after C# has selected a find match. Wait until that browser/render
-    // cycle settles, then reapply the range to the same captured DOM node.
-    // The connectivity check prevents a late callback from touching a new tab.
-    setSelectionAfterRender: function (selector, start, end) {
-        var el = document.querySelector(selector);
-        if (!el) return Promise.resolve();
-        return new Promise(function (resolve) {
-            requestAnimationFrame(function () {
-                requestAnimationFrame(function () {
-                    if (el.isConnected) {
-                        el.selectionStart = start;
-                        el.selectionEnd = end;
-                    }
-                    resolve();
-                });
-            });
-        });
-    },
-
     // Plain getter — C# already has `value=` binding but during find we
     // sometimes need a fresh snapshot uncached by Blazor's render diff.
     getValue: function (selector) {
@@ -47,33 +27,56 @@ window.domBridge = {
         return el ? el.value : '';
     },
 
-    // Scroll the textarea so the current selection's first visual line is
-    // centred. When the find overlay has rendered its current <mark>, its
-    // client rect accounts for soft-wrapped lines exactly. The newline-based
-    // estimate remains as a fallback for callers without that overlay.
-    scrollSelectionIntoView: function (selector) {
+    // Select and reveal the exact C#-owned match range. A textarea does not
+    // expose caret geometry, so map the explicit character offsets through a
+    // short-lived, style-identical plain-text mirror with a DOM Range. The
+    // measurement node is removed synchronously and never depends on which
+    // asynchronously painted <mark> is current. The physical-line estimate
+    // remains a safe fallback if the editor has no mirror template.
+    revealSelection: function (selector, start, end) {
         var el = document.querySelector(selector);
         if (!el) return;
-        var idx = el.selectionStart;
-        if (typeof idx !== 'number') return;
+
+        var textLength = el.value.length;
+        var safeStart = Math.max(0, Math.min(textLength, Number(start) || 0));
+        var safeEnd = Math.max(safeStart, Math.min(textLength, Number(end) || 0));
+        el.selectionStart = safeStart;
+        el.selectionEnd = safeEnd;
 
         var wrap = el.closest('.editor-mirror-wrap');
-        var mirror = wrap && wrap.querySelector('.editor-mirror');
-        var currentMark = mirror && mirror.querySelector('mark.match-current');
-        if (currentMark) {
-            var markRects = currentMark.getClientRects();
-            if (markRects.length > 0) {
-                var markRect = markRects[0];
-                var mirrorRect = mirror.getBoundingClientRect();
-                var markTop = markRect.top - mirrorRect.top + mirror.scrollTop;
-                var exactTop = markTop + markRect.height / 2 - el.clientHeight / 2;
-                var maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
-                el.scrollTop = Math.max(0, Math.min(maxScroll, exactTop));
-                return;
+        var mirrorTemplate = wrap && wrap.querySelector('.editor-mirror');
+        if (mirrorTemplate) {
+            var measurement = mirrorTemplate.cloneNode(false);
+            measurement.setAttribute('aria-hidden', 'true');
+            measurement.style.visibility = 'hidden';
+            measurement.style.pointerEvents = 'none';
+            measurement.style.zIndex = '-1';
+            measurement.textContent = el.value;
+            wrap.appendChild(measurement);
+            try {
+                var startPosition = findTextPosition(measurement, safeStart);
+                var endPosition = findTextPosition(measurement, safeEnd);
+                if (startPosition && endPosition) {
+                    var range = document.createRange();
+                    range.setStart(startPosition.node, startPosition.offset);
+                    range.setEnd(endPosition.node, endPosition.offset);
+                    var rangeRects = range.getClientRects();
+                    if (rangeRects.length > 0) {
+                        var rangeRect = rangeRects[0];
+                        var measurementRect = measurement.getBoundingClientRect();
+                        var rangeTop = rangeRect.top - measurementRect.top;
+                        var exactTop = rangeTop + rangeRect.height / 2 - el.clientHeight / 2;
+                        var maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+                        el.scrollTop = Math.max(0, Math.min(maxScroll, exactTop));
+                        return;
+                    }
+                }
+            } finally {
+                measurement.remove();
             }
         }
 
-        var before = el.value.substring(0, idx);
+        var before = el.value.substring(0, safeStart);
         var lineNum = (before.match(/\n/g) || []).length;
         var cs = window.getComputedStyle(el);
         var lineHeight = parseFloat(cs.lineHeight);
@@ -83,6 +86,19 @@ window.domBridge = {
         var paddingTop = parseFloat(cs.paddingTop) || 0;
         el.scrollTop = Math.max(0,
             paddingTop + lineNum * lineHeight - el.clientHeight / 2);
+
+        function findTextPosition(root, offset) {
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            var remaining = offset;
+            var node;
+            while ((node = walker.nextNode())) {
+                if (remaining <= node.data.length) {
+                    return { node: node, offset: remaining };
+                }
+                remaining -= node.data.length;
+            }
+            return null;
+        }
     },
 
     getScrollRatio: function (selector) {

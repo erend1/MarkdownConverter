@@ -69,7 +69,7 @@ public class FindPresenterTests
     }
 
     [Fact]
-    public async Task NextAsync_SeedsFromCaret_SelectsAndScrollsNextMatch()
+    public async Task NextAsync_SeedsFromCaret_RevealsExplicitNextMatch()
     {
         var bridge = new RecordingEditorBridge("foo bar foo")
         {
@@ -83,7 +83,7 @@ public class FindPresenterTests
         Assert.Equal(1, result.Index);
         Assert.Equal(new TextRange(8, 11), bridge.Selection);
         Assert.Equal(
-            ["GetValue", "GetSelection", "SetSelection:8:11", "ScrollSelectionIntoView"],
+            ["GetValue", "GetSelection", "RevealSelection:8:11"],
             bridge.Calls);
     }
 
@@ -101,7 +101,7 @@ public class FindPresenterTests
         Assert.Equal(2, result.Total);
         Assert.Equal(0, result.Index);
         Assert.Equal(new TextRange(0, 3), bridge.Selection);
-        Assert.Equal(1, bridge.ScrollCalls);
+        Assert.Equal(1, bridge.RevealCalls);
     }
 
     [Fact]
@@ -120,26 +120,47 @@ public class FindPresenterTests
     }
 
     [Fact]
-    public async Task ReplaceNextAsync_ExactSelection_PerformsOneUndoableEdit()
+    public async Task ReplaceCurrentAsync_CollapsedDomSelection_ReplacesPresenterCurrentMatch()
     {
         var bridge = new RecordingEditorBridge("foo bar foo")
         {
-            Selection = new TextRange(0, 3)
+            Selection = new TextRange(0, 0)
         };
         var sut = CreatePresenter(bridge);
+        await sut.NextAsync(Selector, "foo", FindOptions.Default);
+        bridge.Selection = new TextRange(0, 0);
+        bridge.Calls.Clear();
 
-        var result = await sut.ReplaceNextAsync(
+        var result = await sut.ReplaceCurrentAsync(
             Selector, "foo", "zip", FindOptions.Default);
 
         Assert.Equal(1, result.Count);
-        Assert.Null(result.Navigation);
         Assert.Equal("zip bar foo", bridge.Value);
-        Assert.Equal(["GetValue", "GetSelection", "InsertText:zip"], bridge.Calls);
+        Assert.Equal(["GetValue", "SetSelection:0:3", "InsertText:zip"], bridge.Calls);
         Assert.Empty(sut.Matches);
     }
 
     [Fact]
-    public async Task ReplaceNextAsync_NonMatchingSelection_NavigatesWithoutEditing()
+    public async Task ReplaceCurrentAsync_WithoutCurrentMatch_DoesNotNavigateOrEdit()
+    {
+        var bridge = new RecordingEditorBridge("foo bar foo")
+        {
+            Selection = new TextRange(4, 7)
+        };
+        var sut = CreatePresenter(bridge);
+
+        var result = await sut.ReplaceCurrentAsync(
+            Selector, "foo", "zip", FindOptions.Default);
+
+        Assert.Equal(0, result.Count);
+        Assert.Equal("foo bar foo", bridge.Value);
+        Assert.Equal(["GetValue"], bridge.Calls);
+        Assert.DoesNotContain(bridge.Calls, call => call.StartsWith("InsertText:"));
+        Assert.Equal(new TextRange(4, 7), bridge.Selection);
+    }
+
+    [Fact]
+    public async Task ReplaceNextAsync_CompatibilityAlias_DoesNotNavigate()
     {
         var bridge = new RecordingEditorBridge("foo bar foo")
         {
@@ -151,12 +172,41 @@ public class FindPresenterTests
             Selector, "foo", "zip", FindOptions.Default);
 
         Assert.Equal(0, result.Count);
-        Assert.NotNull(result.Navigation);
-        Assert.Equal(2, result.Navigation!.Total);
-        Assert.Equal(1, result.Navigation.Index);
+        Assert.Null(result.Navigation);
         Assert.Equal("foo bar foo", bridge.Value);
-        Assert.DoesNotContain(bridge.Calls, call => call.StartsWith("InsertText:"));
-        Assert.Equal(new TextRange(8, 11), bridge.Selection);
+        Assert.Equal(["GetValue"], bridge.Calls);
+    }
+
+    [Fact]
+    public async Task ReplaceCurrentAsync_ChangedDocument_InvalidatesCurrentMatch()
+    {
+        var bridge = new RecordingEditorBridge("foo bar foo");
+        var sut = CreatePresenter(bridge);
+        await sut.NextAsync(Selector, "foo", FindOptions.Default);
+        bridge.ReplaceValue("changed foo bar foo");
+        bridge.Calls.Clear();
+
+        var result = await sut.ReplaceCurrentAsync(
+            Selector, "foo", "zip", FindOptions.Default);
+
+        Assert.Equal(0, result.Count);
+        Assert.Equal("changed foo bar foo", bridge.Value);
+        Assert.Equal(-1, sut.CurrentIndex);
+        Assert.Equal(["GetValue"], bridge.Calls);
+    }
+
+    [Fact]
+    public async Task ReplaceCurrentAsync_InvalidRegex_ReturnsTypedFailureWithoutEditing()
+    {
+        var bridge = new RecordingEditorBridge("foo");
+        var sut = CreatePresenter(bridge);
+
+        var result = await sut.ReplaceCurrentAsync(
+            Selector, "[", "zip", new FindOptions { Regex = true });
+
+        Assert.Equal(FindFailure.InvalidPattern, result.Failure);
+        Assert.Equal("foo", bridge.Value);
+        Assert.Equal(["GetValue"], bridge.Calls);
     }
 
     [Fact]
@@ -203,7 +253,7 @@ public class FindPresenterTests
     }
 
     [Fact]
-    public async Task ReplaceNextAsync_MatchOutsideScope_NavigatesInsideScopeWithoutEditing()
+    public async Task ReplaceCurrentAsync_WithScope_UsesScopedPresenterMatch()
     {
         var bridge = new RecordingEditorBridge("foo bar foo")
         {
@@ -211,21 +261,25 @@ public class FindPresenterTests
         };
         var sut = CreatePresenter(bridge);
         await sut.SetScopeFromSelectionAsync(Selector);
+        await sut.NextAsync(
+            Selector,
+            "foo",
+            new FindOptions { InSelection = true });
         bridge.Selection = new TextRange(8, 11);
         bridge.Calls.Clear();
 
-        var result = await sut.ReplaceNextAsync(
+        var result = await sut.ReplaceCurrentAsync(
             Selector,
             "foo",
             "zip",
             new FindOptions { InSelection = true });
 
-        Assert.Equal(0, result.Count);
-        Assert.NotNull(result.Navigation);
-        Assert.Equal(1, result.Navigation!.Total);
-        Assert.Equal(new TextRange(0, 3), bridge.Selection);
-        Assert.Equal("foo bar foo", bridge.Value);
-        Assert.DoesNotContain(bridge.Calls, call => call.StartsWith("InsertText:"));
+        Assert.Equal(1, result.Count);
+        Assert.Equal("zip bar foo", bridge.Value);
+        Assert.False(sut.HasScope);
+        Assert.Equal(
+            ["GetValue", "SetSelection:0:3", "InsertText:zip"],
+            bridge.Calls);
     }
 
     [Fact]
@@ -315,7 +369,7 @@ public class FindPresenterTests
         Assert.Equal(FindFailure.InvalidPattern, result.Failure);
         Assert.Equal(-1, result.Index);
         Assert.DoesNotContain(bridge.Calls, call =>
-            call.StartsWith("SetSelection:") || call == "ScrollSelectionIntoView");
+            call.StartsWith("RevealSelection:"));
     }
 
     [Fact]
@@ -373,9 +427,6 @@ public class FindPresenterTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask SetSelectionAfterRenderAsync(
-            string selector, int start, int end) => ValueTask.CompletedTask;
-
         public async ValueTask<string> GetValueAsync(string selector)
         {
             ValueReadCalls++;
@@ -400,8 +451,11 @@ public class FindPresenterTests
             }
         }
 
-        public ValueTask ScrollSelectionIntoViewAsync(string selector) =>
-            ValueTask.CompletedTask;
+        public ValueTask RevealSelectionAsync(string selector, int start, int end)
+        {
+            LastSelection = new TextRange(start, end);
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask<double> GetScrollRatioAsync(string selector) =>
             ValueTask.FromResult(0d);
@@ -423,7 +477,7 @@ public class FindPresenterTests
         public string Value { get; private set; }
         public TextRange Selection { get; set; }
         public List<string> Calls { get; } = [];
-        public int ScrollCalls { get; private set; }
+        public int RevealCalls { get; private set; }
 
         public void ReplaceValue(string value) => Value = value;
 
@@ -440,19 +494,17 @@ public class FindPresenterTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask SetSelectionAfterRenderAsync(
-            string selector, int start, int end) => ValueTask.CompletedTask;
-
         public ValueTask<string> GetValueAsync(string selector)
         {
             Calls.Add("GetValue");
             return ValueTask.FromResult(Value);
         }
 
-        public ValueTask ScrollSelectionIntoViewAsync(string selector)
+        public ValueTask RevealSelectionAsync(string selector, int start, int end)
         {
-            Calls.Add("ScrollSelectionIntoView");
-            ScrollCalls++;
+            Calls.Add($"RevealSelection:{start}:{end}");
+            Selection = new TextRange(start, end);
+            RevealCalls++;
             return ValueTask.CompletedTask;
         }
 
@@ -501,13 +553,10 @@ public class FindPresenterTests
         public ValueTask SetSelectionAsync(string selector, int start, int end) =>
             ValueTask.CompletedTask;
 
-        public ValueTask SetSelectionAfterRenderAsync(
-            string selector, int start, int end) => ValueTask.CompletedTask;
-
         public ValueTask<string> GetValueAsync(string selector) =>
             ValueTask.FromResult(string.Empty);
 
-        public ValueTask ScrollSelectionIntoViewAsync(string selector) =>
+        public ValueTask RevealSelectionAsync(string selector, int start, int end) =>
             ValueTask.CompletedTask;
 
         public ValueTask<double> GetScrollRatioAsync(string selector) =>

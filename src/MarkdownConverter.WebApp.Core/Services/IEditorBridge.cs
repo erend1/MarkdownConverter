@@ -22,23 +22,17 @@ public interface IEditorBridge
     ValueTask SetSelectionAsync(string selector, int start, int end);
 
     /// <summary>
-    /// Assigns the selection after the current browser render cycle settles.
-    /// Used when a button-triggered component render would otherwise restore
-    /// the textarea's earlier caret after navigation.
-    /// </summary>
-    ValueTask SetSelectionAfterRenderAsync(string selector, int start, int end);
-
-    /// <summary>
     /// Returns the current <c>.value</c> of the matched element, bypassing
     /// any Blazor render-cycle staleness.
     /// </summary>
     ValueTask<string> GetValueAsync(string selector);
 
     /// <summary>
-    /// Scrolls the matched element so its current selection is centred
-    /// vertically.
+    /// Selects the explicit half-open range and scrolls the matched editor so
+    /// that range is centred vertically. The range is supplied by the C# find
+    /// owner rather than inferred from asynchronously rendered highlights.
     /// </summary>
-    ValueTask ScrollSelectionIntoViewAsync(string selector);
+    ValueTask RevealSelectionAsync(string selector, int start, int end);
 
     /// <summary>
     /// Reads the vertical scroll position as a proportional value in the

@@ -47,7 +47,7 @@ public partial class AppFindBar
     private bool _useInSelection;
     private bool _invalidRegex;
     private bool _showingReplacementResult;
-    private bool _restoreCurrentMatchAfterRender;
+    private bool _canReplaceCurrent;
 
     private FindOptions CurrentOptions => new()
     {
@@ -57,29 +57,10 @@ public partial class AppFindBar
         InSelection = _useInSelection
     };
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!_restoreCurrentMatchAfterRender) return;
-
-        _restoreCurrentMatchAfterRender = false;
-        var currentIndex = FindPresenter.CurrentIndex;
-        var matches = FindPresenter.Matches;
-        if (currentIndex < 0 || currentIndex >= matches.Count) return;
-
-        // A render triggered by a find/replace button can restore the
-        // textarea's post-edit caret after navigation selected the next
-        // match. Reapply the C#-owned current range after that render, then
-        // let the browser adapter centre its rendered highlight geometry.
-        var match = matches[currentIndex];
-        await EditorBridge.SetSelectionAfterRenderAsync(
-            TextareaSelector, match.Start, match.End);
-        await EditorBridge.ScrollSelectionIntoViewAsync(TextareaSelector);
-    }
-
     private void OnFindTextChanged(string value)
     {
         FindPresenter.CancelPendingOperations();
-        _restoreCurrentMatchAfterRender = false;
+        _canReplaceCurrent = false;
         _findText = value;
         _matchInfo = string.Empty;
         _invalidRegex = false;
@@ -102,7 +83,7 @@ public partial class AppFindBar
         if (result.IsStale) return;
         _useInSelection = FindPresenter.HasScope;
         _showingReplacementResult = false;
-        ScheduleCurrentMatchRestore(result);
+        UpdateCurrentMatchAvailability(result);
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -117,7 +98,7 @@ public partial class AppFindBar
         if (result.IsStale) return;
         _useInSelection = FindPresenter.HasScope;
         _showingReplacementResult = false;
-        ScheduleCurrentMatchRestore(result);
+        UpdateCurrentMatchAvailability(result);
         UpdateMatchInfo(result);
         await OnAfterFindChanged.InvokeAsync();
     }
@@ -127,8 +108,8 @@ public partial class AppFindBar
 
     private async Task ReplaceCoreAsync()
     {
-        if (string.IsNullOrEmpty(_findText)) return;
-        var result = await FindPresenter.ReplaceNextAsync(
+        if (string.IsNullOrEmpty(_findText) || !_canReplaceCurrent) return;
+        var result = await FindPresenter.ReplaceCurrentAsync(
             TextareaSelector, _findText, _replaceText, CurrentOptions);
         if (result.IsStale) return;
         _useInSelection = FindPresenter.HasScope;
@@ -138,18 +119,9 @@ public partial class AppFindBar
             return;
         }
         _invalidRegex = false;
-        if (result.Navigation is not null)
-        {
-            _showingReplacementResult = false;
-            ScheduleCurrentMatchRestore(result.Navigation);
-            UpdateMatchInfo(result.Navigation);
-        }
-        else
-        {
-            _restoreCurrentMatchAfterRender = false;
-            _showingReplacementResult = true;
-            _matchInfo = $"Replaced {result.Count}";
-        }
+        _canReplaceCurrent = false;
+        _showingReplacementResult = true;
+        _matchInfo = $"Replaced {result.Count}";
         await OnAfterFindChanged.InvokeAsync();
     }
 
@@ -169,7 +141,7 @@ public partial class AppFindBar
             return;
         }
         _invalidRegex = false;
-        _restoreCurrentMatchAfterRender = false;
+        _canReplaceCurrent = false;
         _showingReplacementResult = true;
         _matchInfo = $"Replaced {result.Count}";
         await OnAfterFindChanged.InvokeAsync();
@@ -239,6 +211,7 @@ public partial class AppFindBar
     private async Task RefreshAsync()
     {
         if (string.IsNullOrEmpty(_findText)) return;
+        _canReplaceCurrent = false;
         await OnFindNext();
     }
 
@@ -258,7 +231,7 @@ public partial class AppFindBar
     private async Task OnTextareaContentChangedCoreAsync()
     {
         if (string.IsNullOrEmpty(_findText)) return;
-        _restoreCurrentMatchAfterRender = false;
+        _canReplaceCurrent = false;
         var text = await EditorBridge.GetValueAsync(TextareaSelector);
         var result = FindPresenter.RefreshAgainst(text, _findText, CurrentOptions);
         _useInSelection = FindPresenter.HasScope;
@@ -284,7 +257,7 @@ public partial class AppFindBar
     public async Task OnActiveDocumentChangedAsync()
     {
         FindPresenter.Reset();
-        _restoreCurrentMatchAfterRender = false;
+        _canReplaceCurrent = false;
         _useInSelection = false;
         _invalidRegex = false;
         _showingReplacementResult = false;
@@ -296,13 +269,13 @@ public partial class AppFindBar
     private async Task OnCloseClicked()
     {
         FindPresenter.Reset();
-        _restoreCurrentMatchAfterRender = false;
+        _canReplaceCurrent = false;
         await OnClose.InvokeAsync();
     }
 
-    private void ScheduleCurrentMatchRestore(FindResult result)
+    private void UpdateCurrentMatchAvailability(FindResult result)
     {
-        _restoreCurrentMatchAfterRender = result.Failure == FindFailure.None
+        _canReplaceCurrent = result.Failure == FindFailure.None
             && result.Index >= 0;
     }
 
@@ -315,6 +288,7 @@ public partial class AppFindBar
 
     private void UpdateFailure(FindFailure failure)
     {
+        _canReplaceCurrent = false;
         _invalidRegex = failure == FindFailure.InvalidPattern;
         _matchInfo = FindStatusFormatter.FormatFailure(failure);
         StateHasChanged();
