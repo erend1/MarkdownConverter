@@ -502,7 +502,7 @@ textarea {
 }
 
 .editor-find-button {
-    display: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
@@ -1291,10 +1291,6 @@ textarea {
         flex-direction: row;
         align-items: center;
         gap: 5px;
-    }
-
-    .editor-find-button {
-        display: inline-flex;
     }
 
     .workspace-document-strip {
