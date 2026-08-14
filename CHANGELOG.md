@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-beta.1] - 2026-08-14
+
+This beta combines the stabilized editor find/replace workflow with the responsive Ink & Paper workspace for broader desktop, tablet, and mobile validation.
+
 ### Added
 
 - Added the responsive Ink & Paper workspace with wide split panes, compact Source/Preview switching, pointer and keyboard resizing, a streamlined command bar, visible Find access at every width with touch-sized controls, dynamic viewport handling, and shared Web/Desktop rendering.
@@ -13,6 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Restored reliable Ctrl/Cmd+F and Ctrl/Cmd+H focus, explicit-range find navigation, strict replace-current behavior, scoped-search cleanup, native-undo replacement, and shortcut listener disposal in the shared WebApp editor.
+
+### Known limitations
+
+- The Desktop distribution is an unsigned portable Windows x64 archive; it has no installer, automatic updates, or automatic file-association management.
+- Desktop requires the Microsoft Edge WebView2 Runtime. Compiled PDF export additionally requires a compatible local LaTeX installation.
+- Windows x64 is the only packaged Desktop platform. The standalone WebApp remains available through GitHub Pages.
 
 ## [0.1.0-alpha.2] - 2026-08-12
 
