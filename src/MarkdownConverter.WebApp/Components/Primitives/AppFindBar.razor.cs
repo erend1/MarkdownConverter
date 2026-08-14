@@ -13,6 +13,7 @@ namespace MarkdownConverter.WebApp.Components.Primitives;
 /// </summary>
 public partial class AppFindBar
 {
+    [Parameter] public string? Id { get; set; }
     [Inject] private IFindPresenter FindPresenter { get; set; } = default!;
     [Inject] private IEditorBridge EditorBridge { get; set; } = default!;
     [Inject] private IToastService ToastService { get; set; } = default!;

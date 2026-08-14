@@ -107,19 +107,21 @@ textarea {
 .app-toolbar {
     display: flex;
     align-items: center;
-    padding: 7px 12px;
+    padding: 8px 12px;
     background: var(--bg-toolbar);
     border-bottom: 1px solid var(--border-color);
-    gap: 10px;
+    gap: 12px;
     flex-shrink: 0;
-    min-height: 54px;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+    min-height: 52px;
+    box-shadow: 0 1px 2px rgba(34, 44, 63, 0.06);
     position: relative;
     z-index: 20;
 }
 
 .toolbar-left {
     flex-shrink: 0;
+    padding-right: 12px;
+    border-right: 1px solid var(--border-color);
 }
 
 .toolbar-center {
@@ -130,6 +132,8 @@ textarea {
 
 .toolbar-right {
     flex-shrink: 0;
+    padding-left: 10px;
+    border-left: 1px solid var(--border-color);
 }
 
 .app-brand {
@@ -497,6 +501,39 @@ textarea {
     display: none;
 }
 
+.editor-find-button {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 32px;
+    min-width: 32px;
+    min-height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.editor-find-button:hover,
+.editor-find-button[aria-expanded="true"] {
+    background: var(--accent-soft);
+    color: var(--accent-color);
+}
+
+.editor-find-button svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 /* Find/Replace bar */
 .find-bar {
     display: flex;
@@ -536,6 +573,10 @@ textarea {
 .find-count-invalid {
     color: var(--error-color);
     font-weight: 500;
+}
+
+.find-actions-break {
+    display: none;
 }
 
 .find-toggle {
@@ -726,8 +767,8 @@ textarea {
 /* Toolbar command groups */
 .toolbar-command-rail {
     display: flex;
-    align-items: stretch;
-    gap: 8px;
+    align-items: center;
+    gap: 9px;
     min-width: max-content;
     width: 100%;
     overflow: visible;
@@ -735,11 +776,10 @@ textarea {
 
 .toolbar-command-group {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding-right: 8px;
+    padding-right: 9px;
     border-right: 1px solid var(--border-color);
 }
 
@@ -748,19 +788,10 @@ textarea {
     border-right: 0;
 }
 
-.toolbar-group-label {
-    color: var(--text-secondary);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
 .toolbar-group-controls {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 2px;
     min-height: var(--control-min-size);
 }
 
@@ -823,24 +854,26 @@ textarea {
 .btn-pdf {
     background: transparent;
     color: var(--text-secondary);
-    border-style: dashed;
+    border-color: transparent;
 }
 
-.btn-pdf:hover {
+.btn-pdf:hover:not(:disabled) {
+    background: var(--accent-soft);
     color: var(--text-primary);
-    border-style: solid;
+    border-color: transparent;
 }
 
 .btn-compile-pdf {
-    background: #cf222e;
-    color: #fff;
-    border-color: #cf222e;
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: transparent;
     font-weight: 500;
 }
 
 .btn-compile-pdf:hover:not(:disabled) {
-    background: #a40e26;
-    border-color: #a40e26;
+    background: var(--accent-soft);
+    color: var(--text-primary);
+    border-color: transparent;
 }
 
 .btn-sm {
@@ -850,8 +883,38 @@ textarea {
 }
 
 .btn-theme {
-    font-size: 11px;
-    padding: 5px 9px;
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+}
+
+.btn-theme:hover {
+    border-color: transparent;
+    background: var(--accent-soft);
+    color: var(--accent-color);
+}
+
+.btn-theme .icon {
+    font-size: 15px;
+}
+
+.toolbar-command-rail .btn:not(.btn-export) {
+    border-color: transparent;
+    background: transparent;
+}
+
+.toolbar-command-rail .btn:not(.btn-export):hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--accent-soft);
+    color: var(--accent-color);
+}
+
+.toolbar-command-rail .btn:active:not(:disabled),
+.btn-theme:active:not(:disabled) {
+    transform: none;
 }
 
 .file-upload-button {
@@ -878,7 +941,12 @@ textarea {
 .export-panel {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
+}
+
+.export-primary-action {
+    display: flex;
+    align-items: stretch;
 }
 
 .export-select {
@@ -892,6 +960,15 @@ textarea {
     font-family: var(--font-sans);
     transition: border-color 0.15s;
     cursor: pointer;
+}
+
+.export-primary-action .export-select {
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+    border-right: 0;
+}
+
+.export-primary-action .btn-export {
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
 .export-select:hover {
@@ -1158,11 +1235,15 @@ textarea {
 
     .toolbar-left {
         grid-area: identity;
+        padding-right: 0;
+        border-right: 0;
     }
 
     .toolbar-right {
         grid-area: theme;
         justify-self: end;
+        padding-left: 0;
+        border-left: 0;
     }
 
     .toolbar-center {
@@ -1212,13 +1293,8 @@ textarea {
         gap: 5px;
     }
 
-    .toolbar-group-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
+    .editor-find-button {
+        display: inline-flex;
     }
 
     .workspace-document-strip {
@@ -1373,6 +1449,7 @@ textarea {
     .btn,
     .btn-sm,
     .export-select,
+    .editor-find-button,
     .workspace-view-button,
     .find-toggle {
         min-height: 44px;
@@ -1445,7 +1522,7 @@ textarea {
 
     .editor-header,
     .preview-header {
-        min-height: 36px;
+        min-height: 44px;
         padding: 5px 10px;
     }
 
@@ -1475,19 +1552,67 @@ textarea {
         padding: 6px;
     }
 
+    .find-bar::after {
+        content: "";
+        order: 0;
+        flex: 0 0 100%;
+        height: 0;
+    }
+
     .find-input {
-        flex-basis: 100%;
         min-width: 0;
         min-height: 44px;
         font-size: 16px;
     }
 
+    .find-query-input {
+        order: 0;
+        flex: 1 1 calc(100% - 106px);
+    }
+
     .find-count {
+        order: 0;
+        flex: 0 0 52px;
         min-width: 52px;
+        text-align: center;
+    }
+
+    .find-count:empty {
+        display: none;
     }
 
     .find-close {
+        order: 0;
+        flex: 0 0 44px;
         margin-left: 0;
+    }
+
+    .find-replacement-input {
+        order: 1;
+        flex: 1 1 calc(100% - 120px);
+    }
+
+    .find-replace-current,
+    .find-replace-all {
+        order: 1;
+    }
+
+    .find-actions-break {
+        display: block;
+        order: 1;
+        flex: 0 0 100%;
+        height: 0;
+    }
+
+    .find-toggle,
+    .find-prev,
+    .find-next {
+        order: 2;
+    }
+
+    .find-replace-toggle {
+        order: 2;
+        flex: 1 1 auto;
     }
 
     .preview-paper {
@@ -1528,6 +1653,7 @@ textarea {
     .btn,
     .btn-sm,
     .export-select,
+    .editor-find-button,
     .find-toggle,
     .workspace-view-button,
     .tab-select,

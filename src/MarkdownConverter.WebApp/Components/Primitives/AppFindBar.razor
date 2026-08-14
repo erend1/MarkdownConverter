@@ -1,8 +1,8 @@
 @namespace MarkdownConverter.WebApp.Components.Primitives
 
-<div class="find-bar">
+<div id="@Id" class="find-bar">
     <AppTextInput @ref="_findInput"
-                  CssClass="find-input"
+                  CssClass="find-input find-query-input"
                   Value="@_findText"
                   ValueChanged="OnFindTextChanged"
                   OnKeyDown="OnFindKeyDown"
@@ -10,17 +10,22 @@
                   Placeholder="Find..." />
     @if (ShowReplace)
     {
-        <AppTextInput CssClass="find-input"
+        <AppTextInput CssClass="find-input find-replacement-input"
                       Value="@_replaceText"
                       ValueChanged="OnReplaceTextChanged"
                       OnKeyDown="OnReplaceKeyDown"
                       AriaLabel="Replacement text"
                       Placeholder="Replace..." />
         <AppButton Size="ButtonSize.Sm"
+                   CssClass="find-replace-current"
                    OnClick="OnReplace"
                    Disabled="@(!_canReplaceCurrent)"
                    Title="Replace current match">Replace</AppButton>
-        <AppButton Size="ButtonSize.Sm" OnClick="OnReplaceAll" Title="Replace All">All</AppButton>
+        <AppButton Size="ButtonSize.Sm"
+                   CssClass="find-replace-all"
+                   OnClick="OnReplaceAll"
+                   Title="Replace All">All</AppButton>
+        <span class="find-actions-break" aria-hidden="true"></span>
     }
     <AppToggleButton Active="@_useCaseSensitive"
                      OnToggle="ToggleCaseSensitive"
@@ -39,13 +44,15 @@
                      OnToggle="ToggleInSelection"
                      Label="⇪"
                      Title="Find in selection" />
-    <AppIconButton IconClass="btn btn-sm"
+    <AppIconButton IconClass="btn btn-sm find-prev"
                    OnClick="OnFindPrev"
                    Title="Previous (Shift+Enter)">&uarr;</AppIconButton>
-    <AppIconButton IconClass="btn btn-sm"
+    <AppIconButton IconClass="btn btn-sm find-next"
                    OnClick="OnFindNext"
                    Title="Next (Enter)">&darr;</AppIconButton>
-    <AppButton Size="ButtonSize.Sm" OnClick="ToggleReplace"
+    <AppButton Size="ButtonSize.Sm"
+               CssClass="find-replace-toggle"
+               OnClick="ToggleReplace"
                Title="Toggle Replace (Ctrl+H)">
         @(ShowReplace ? "Find" : "Replace")
     </AppButton>

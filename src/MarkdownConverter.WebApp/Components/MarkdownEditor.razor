@@ -18,11 +18,24 @@
                 &middot; @TabPresenter.ActiveTab.CharCount chars
             </span>
         </span>
+        <button type="button"
+                class="editor-find-button"
+                @onclick="OpenFindBar"
+                title="Find in document"
+                aria-label="Find in document"
+                aria-controls="editor-find-bar"
+                aria-expanded="@(_showFind ? "true" : "false")">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.2-3.2"></path>
+            </svg>
+        </button>
     </div>
 
     @if (_showFind)
     {
         <AppFindBar @ref="_findBar"
+                    Id="editor-find-bar"
                     ShowReplace="_showReplace"
                     ShowReplaceChanged="OnShowReplaceChanged"
                     OnClose="OnFindBarClosed"
