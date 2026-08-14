@@ -14,7 +14,10 @@
                       ValueChanged="OnReplaceTextChanged"
                       OnKeyDown="OnReplaceKeyDown"
                       Placeholder="Replace..." />
-        <AppButton Size="ButtonSize.Sm" OnClick="OnReplace" Title="Replace">Replace</AppButton>
+        <AppButton Size="ButtonSize.Sm"
+                   OnClick="OnReplace"
+                   Disabled="@(!_canReplaceCurrent)"
+                   Title="Replace current match">Replace</AppButton>
         <AppButton Size="ButtonSize.Sm" OnClick="OnReplaceAll" Title="Replace All">All</AppButton>
     }
     <AppToggleButton Active="@_useCaseSensitive"
