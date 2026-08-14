@@ -10,7 +10,7 @@
                     IsActive="idx == TabPresenter.ActiveIndex"
                     IsDragOver="_dragOverIndex == idx"
                     IsRenaming="_renamingIndex == idx"
-                    RenameText="_renameText"
+                    RenameText="@_renameText"
                     RenameTextChanged="@(v => _renameText = v)"
                     OnClick="@(() => SwitchToAsync(idx))"
                     OnDragStart="@(() => OnDragStart(idx))"
