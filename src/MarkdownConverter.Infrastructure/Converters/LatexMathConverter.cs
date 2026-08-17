@@ -1,5 +1,9 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Math;
+using WordParagraph = DocumentFormat.OpenXml.Wordprocessing.Paragraph;
+using WordParagraphProperties = DocumentFormat.OpenXml.Wordprocessing.ParagraphProperties;
+using WordJustification = DocumentFormat.OpenXml.Wordprocessing.Justification;
+using WordJustificationValues = DocumentFormat.OpenXml.Wordprocessing.JustificationValues;
 
 namespace MarkdownConverter.Infrastructure.Converters;
 
@@ -20,11 +24,20 @@ internal static class LatexMathConverter
         return oMath;
     }
 
-    public static Paragraph ToDisplayMath(string latex)
+    public static WordParagraph ToDisplayMath(string latex)
     {
-        var oMathPara = new Paragraph();
-        oMathPara.Append(ToInlineMath(latex));
-        return oMathPara;
+        var paragraph = new WordParagraph();
+
+        paragraph.Append(
+            new WordParagraphProperties(
+                new WordJustification
+                {
+                    Val = WordJustificationValues.Center
+                }));
+
+        paragraph.Append(ToInlineMath(latex));
+
+        return paragraph;
     }
 
     #region Tokenizer
