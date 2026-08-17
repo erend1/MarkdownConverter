@@ -1,5 +1,6 @@
 using DocumentFormat.OpenXml.Math;
 using MarkdownConverter.Infrastructure.Converters;
+using WordParagraph = DocumentFormat.OpenXml.Wordprocessing.Paragraph;
 
 namespace MarkdownConverter.Infrastructure.Tests;
 
@@ -11,15 +12,6 @@ public class LatexMathConverterTests
         var result = LatexMathConverter.ToInlineMath("x");
 
         Assert.IsType<OfficeMath>(result);
-    }
-
-    [Fact]
-    public void ToDisplayMath_ReturnsParagraphContainingOfficeMath()
-    {
-        var result = LatexMathConverter.ToDisplayMath("x");
-
-        Assert.IsType<Paragraph>(result);
-        Assert.Contains(result.ChildElements, e => e is OfficeMath);
     }
 
     [Fact]
@@ -294,5 +286,22 @@ public class LatexMathConverterTests
         var oMath = LatexMathConverter.ToInlineMath(@"\cdots");
 
         Assert.Contains("\u22EF", oMath.OuterXml);
+    }
+
+    [Fact]
+    public void ToDisplayMath_ReturnsWordParagraph()
+    {
+        var result = LatexMathConverter.ToDisplayMath("x");
+
+        Assert.IsType<WordParagraph>(result);
+    }
+
+    [Fact]
+    public void ToDisplayMath_ReturnsParagraphContainingOfficeMath()
+    {
+        var result = LatexMathConverter.ToDisplayMath("x^2");
+
+        Assert.Single(result.Elements<OfficeMath>());
+        Assert.Contains(result.ChildElements, e => e is OfficeMath);
     }
 }
