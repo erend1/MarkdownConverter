@@ -358,9 +358,9 @@ internal static class MarkdownLatexRenderer
 
         if (columnCount == 0) return;
 
-        // Use p{width} columns to bound table within page width
-        // Subtract estimated border/padding overhead per column
-        var colWidth = $"{1.0 / columnCount:F2}\\textwidth";
+        // p{width} columns sized from the cell contents. The widths are shares of what the
+        // line has left after cell padding and rules, so the table cannot exceed the line.
+        var plan = PlanTable(table, columnCount);
 
         var alignments = new string[columnCount];
         for (int i = 0; i < columnCount; i++)
@@ -369,16 +369,26 @@ internal static class MarkdownLatexRenderer
                 ? table.ColumnDefinitions[i].Alignment
                 : (TableColumnAlign?)null;
 
-            // >{\raggedright\arraybackslash} etc. control text alignment within p{} columns
+            var colWidth = plan.ColumnWidth(i);
+
+            // >{\raggedright\arraybackslash} etc. control text alignment within p{} columns;
+            // \hspace{0pt} lets TeX hyphenate the first word of a cell
             alignments[i] = align switch
             {
-                TableColumnAlign.Center => $@">{{\centering\arraybackslash}}p{{{colWidth}}}",
-                TableColumnAlign.Right => $@">{{\raggedleft\arraybackslash}}p{{{colWidth}}}",
-                _ => $@">{{\raggedright\arraybackslash}}p{{{colWidth}}}"
+                TableColumnAlign.Center => $@">{{\centering\arraybackslash\hspace{{0pt}}}}p{{{colWidth}}}",
+                TableColumnAlign.Right => $@">{{\raggedleft\arraybackslash\hspace{{0pt}}}}p{{{colWidth}}}",
+                _ => $@">{{\raggedright\arraybackslash\hspace{{0pt}}}}p{{{colWidth}}}"
             };
         }
 
-        sb.AppendLine(@"\begin{longtable}{" + string.Join(" | ", alignments) + "}");
+        if (plan.CellPadding != null)
+        {
+            // Too many columns for the default cell padding: tighten it for this table only
+            sb.AppendLine(@"\begingroup");
+            sb.AppendLine($@"\setlength{{\tabcolsep}}{{{plan.CellPadding}}}");
+        }
+
+        sb.AppendLine(@"\begin{longtable}{" + string.Join(plan.ColumnSeparator, alignments) + "}");
         sb.AppendLine(@"\hline");
 
         bool isHeader = true;
@@ -391,12 +401,13 @@ internal static class MarkdownLatexRenderer
                 {
                     if (cell is TableCell tableCell)
                     {
+                        var context = new CellContext(plan.ColumnWidthEm(cells.Count), Bold: isHeader);
                         var cellSb = new StringBuilder();
                         foreach (var subBlock in tableCell)
                         {
                             if (subBlock is ParagraphBlock p)
                             {
-                                RenderInlines(p.Inline!, cellSb);
+                                RenderInlines(p.Inline!, cellSb, context);
                             }
                         }
                         cells.Add(cellSb.ToString());
@@ -418,34 +429,300 @@ internal static class MarkdownLatexRenderer
         }
 
         sb.AppendLine(@"\end{longtable}");
+        if (plan.CellPadding != null)
+        {
+            sb.AppendLine(@"\endgroup");
+        }
         sb.AppendLine();
     }
 
-    private static void RenderInlines(ContainerInline container, StringBuilder sb)
+    /// <summary>
+    /// A table cell being rendered: the estimated width of its column, in em of the body
+    /// font, and the font its text is set in.
+    /// </summary>
+    private readonly record struct CellContext(double WidthEm, bool Bold, bool Monospace = false);
+
+    private const string BreakOpportunity = @"\allowbreak ";
+
+    // An unbreakable run is cut into chunks of which this many fit on a line
+    private const int ChunksPerLine = 4;
+
+    private static LatexTablePlan PlanTable(Table table, int columnCount)
+    {
+        var natural = new double[columnCount];
+        var widestWord = new double[columnCount];
+        var unbreakable = new double[columnCount];
+
+        bool isHeader = true;
+        foreach (var row in table)
+        {
+            if (row is TableRow tableRow)
+            {
+                int column = 0;
+                foreach (var cell in tableRow)
+                {
+                    if (cell is TableCell tableCell)
+                    {
+                        var measure = new LatexTableLayout.CellMeasure();
+                        foreach (var subBlock in tableCell)
+                        {
+                            if (subBlock is ParagraphBlock p)
+                            {
+                                MeasureInlines(p.Inline!, measure, bold: isHeader);
+                            }
+                        }
+
+                        natural[column] = Math.Max(natural[column], measure.NaturalEm);
+                        widestWord[column] = Math.Max(widestWord[column], measure.WidestWordEm);
+                        unbreakable[column] = Math.Max(unbreakable[column], measure.UnbreakableEm);
+                        column++;
+                    }
+                }
+                isHeader = false;
+            }
+        }
+
+        return LatexTableLayout.Plan(natural, widestWord, unbreakable);
+    }
+
+    // Mirrors RenderInline: estimates the width of what it would emit for a table cell.
+    private static void MeasureInlines(ContainerInline container, LatexTableLayout.CellMeasure measure, bool bold)
     {
         foreach (var inline in container)
         {
-            RenderInline(inline, sb);
+            switch (inline)
+            {
+                case LiteralInline literal:
+                    MeasureText(literal.Content.ToString(), measure, bold, monospace: false);
+                    break;
+
+                case EmphasisInline emphasis:
+                    MeasureInlines(emphasis, measure, bold || emphasis.DelimiterCount == 2);
+                    break;
+
+                case CodeInline code:
+                    MeasureText(code.Content, measure, bold, monospace: true);
+                    break;
+
+                case MathInline math:
+                    // Math is emitted as written; TeX breaks an inline formula only after its operators
+                    var (mathWidth, mathPart) = LatexTableLayout.MathWidthEm(math.Content.ToString());
+                    measure.AddBox(mathWidth, math.DelimiterCount == 2 ? mathWidth : mathPart);
+                    break;
+
+                case CitationInline citation:
+                    // The printed form is decided by the bibliography style; assume "Author, 2023"
+                    foreach (var _ in citation.Citations)
+                    {
+                        MeasureText(" Author, 2023", measure, bold, monospace: false);
+                    }
+                    break;
+
+                case LinkInline link:
+                    if (link.IsImage)
+                    {
+                        MeasureText($"[Image: {link.Url}]", measure, bold, monospace: false);
+                    }
+                    else
+                    {
+                        MeasureInlines(link, measure, bold);
+                    }
+                    break;
+
+                case LineBreakInline:
+                    measure.AddSpace(LatexTableLayout.SpaceWidthEm(bold, monospace: false));
+                    break;
+
+                case ContainerInline containerInline:
+                    MeasureInlines(containerInline, measure, bold);
+                    break;
+
+                default:
+                    break;
+            }
         }
     }
 
-    private static void RenderInline(Inline inline, StringBuilder sb)
+    private static void MeasureText(string text, LatexTableLayout.CellMeasure measure, bool bold, bool monospace)
+    {
+        foreach (var ch in text)
+        {
+            if (IsBreakingSpace(ch))
+            {
+                measure.AddSpace(LatexTableLayout.SpaceWidthEm(bold, monospace));
+            }
+            else if (!IsDropped(ch))
+            {
+                measure.AddGlyph(LatexTableLayout.CharWidthEm(ch, bold, monospace));
+            }
+        }
+    }
+
+    private static double CellTextWidthEm(ReadOnlySpan<char> text, CellContext cell)
+    {
+        double width = 0;
+        foreach (var ch in text)
+        {
+            if (!IsDropped(ch))
+            {
+                width += LatexTableLayout.CharWidthEm(ch, cell.Bold, cell.Monospace);
+            }
+        }
+        return width;
+    }
+
+    private static bool IsBreakingSpace(char ch) => ch is ' ' or '\t' or '\n' or '\r';
+
+    // Characters the escaper leaves out take no room
+    private static bool IsDropped(char ch) => EscapeLatex(ch).Length == 0;
+
+    /// <summary>
+    /// Escapes table-cell text. A token that cannot fit its column on one line may break
+    /// after a separator or before a camelCase capital; a piece that is still too wide may
+    /// break between any two characters. Nothing is added to text that fits.
+    /// </summary>
+    private static void AppendCellText(StringBuilder sb, string text, CellContext cell)
+    {
+        int i = 0;
+        while (i < text.Length)
+        {
+            if (IsBreakingSpace(text[i]))
+            {
+                sb.Append(text[i++]);
+                continue;
+            }
+
+            int start = i;
+            while (i < text.Length && !IsBreakingSpace(text[i])) i++;
+            AppendCellToken(sb, text.AsSpan(start, i - start), cell);
+        }
+    }
+
+    private static void AppendCellToken(StringBuilder sb, ReadOnlySpan<char> token, CellContext cell)
+    {
+        if (LatexTableLayout.Fits(CellTextWidthEm(token, cell), cell.WidthEm))
+        {
+            AppendEscaped(sb, token);
+            return;
+        }
+
+        int firstAlphanumeric = 0;
+        while (firstAlphanumeric < token.Length && !char.IsLetterOrDigit(token[firstAlphanumeric]))
+        {
+            firstAlphanumeric++;
+        }
+
+        int pieceStart = 0;
+        for (int i = 1; i <= token.Length; i++)
+        {
+            if (i < token.Length && !IsBreakOpportunity(token[i - 1], token[i], i - 1 > firstAlphanumeric))
+            {
+                continue;
+            }
+
+            if (pieceStart > 0) sb.Append(BreakOpportunity);
+            AppendCellPiece(sb, token[pieceStart..i], cell);
+            pieceStart = i;
+        }
+    }
+
+    // "a/b", "a.b", "a_b" may break after the separator that follows a word,
+    // "camelCase" before the capital.
+    private static bool IsBreakOpportunity(char previous, char next, bool previousFollowsWord)
+    {
+        if (!char.IsLetterOrDigit(next)) return false;
+
+        return char.IsLetterOrDigit(previous)
+            ? char.IsUpper(next) && !char.IsUpper(previous)
+            : previousFollowsWord;
+    }
+
+    private static void AppendCellPiece(StringBuilder sb, ReadOnlySpan<char> piece, CellContext cell)
+    {
+        var width = CellTextWidthEm(piece, cell);
+        if (LatexTableLayout.Fits(width, cell.WidthEm))
+        {
+            AppendEscaped(sb, piece);
+            return;
+        }
+
+        // A word breaks with a hyphen; a hash, number or code fragment breaks without one
+        bool isWord = !cell.Monospace;
+        var rendered = new List<string>(piece.Length);
+        foreach (var ch in piece)
+        {
+            var escaped = EscapeLatex(ch);
+            if (escaped.Length == 0) continue;
+
+            isWord &= char.IsLetter(ch);
+            rendered.Add(escaped);
+        }
+
+        var breakMark = isWord ? @"\-" : BreakOpportunity;
+
+        // A line takes several chunks, so it fills well without a break mark after every character
+        double perLine = LatexTableLayout.CharactersPerLine(width, rendered.Count, cell.WidthEm);
+        int step = Math.Max(1, (int)(perLine / ChunksPerLine));
+
+        // Like TeX's own hyphenation, keep two characters before a break and three after it,
+        // unless the column is too narrow to hold that many
+        bool keepEnds = rendered.Count >= 5 && perLine >= 3;
+        int first = keepEnds ? 2 : 1;
+        int last = rendered.Count - (keepEnds ? 3 : 1);
+
+        for (int i = 0; i < rendered.Count; i++)
+        {
+            if (i % step == 0 && i >= first && i <= last) sb.Append(breakMark);
+            sb.Append(rendered[i]);
+        }
+    }
+
+    private static void AppendEscaped(StringBuilder sb, ReadOnlySpan<char> text)
+    {
+        foreach (var ch in text)
+        {
+            sb.Append(EscapeLatex(ch));
+        }
+    }
+
+    private static void RenderInlines(ContainerInline container, StringBuilder sb, CellContext? cell = null)
+    {
+        foreach (var inline in container)
+        {
+            RenderInline(inline, sb, cell);
+        }
+    }
+
+    private static void RenderInline(Inline inline, StringBuilder sb, CellContext? cell = null)
     {
         switch (inline)
         {
             case LiteralInline literal:
-                sb.Append(EscapeLatex(literal.Content.ToString()));
+                if (cell is { } literalCell)
+                    AppendCellText(sb, literal.Content.ToString(), literalCell);
+                else
+                    sb.Append(EscapeLatex(literal.Content.ToString()));
                 break;
 
             case EmphasisInline emphasis:
                 var tag = emphasis.DelimiterCount == 2 ? "textbf" : "textit";
                 sb.Append($@"\{tag}{{");
-                RenderInlines(emphasis, sb);
+                RenderInlines(emphasis, sb,
+                    cell is { } emphasisCell && emphasis.DelimiterCount == 2 ? emphasisCell with { Bold = true } : cell);
                 sb.Append("}");
                 break;
 
             case CodeInline code:
-                sb.Append($@"\texttt{{{EscapeLatex(code.Content)}}}");
+                if (cell is { } codeCell)
+                {
+                    sb.Append(@"\texttt{");
+                    AppendCellText(sb, code.Content, codeCell with { Monospace = true });
+                    sb.Append('}');
+                }
+                else
+                {
+                    sb.Append($@"\texttt{{{EscapeLatex(code.Content)}}}");
+                }
                 break;
 
             case MathInline math:
@@ -478,12 +755,21 @@ internal static class MarkdownLatexRenderer
             case LinkInline link:
                 if (link.IsImage)
                 {
-                    sb.Append($@"\textit{{[Image: {EscapeLatex(link.Url ?? "")}]}}");
+                    if (cell is { } imageCell)
+                    {
+                        sb.Append(@"\textit{");
+                        AppendCellText(sb, $"[Image: {link.Url}]", imageCell);
+                        sb.Append('}');
+                    }
+                    else
+                    {
+                        sb.Append($@"\textit{{[Image: {EscapeLatex(link.Url ?? "")}]}}");
+                    }
                 }
                 else
                 {
                     sb.Append($@"\href{{{link.Url}}}{{");
-                    RenderInlines(link, sb);
+                    RenderInlines(link, sb, cell);
                     sb.Append("}");
                 }
                 break;
@@ -494,7 +780,7 @@ internal static class MarkdownLatexRenderer
                 break;
 
             case ContainerInline containerInline:
-                RenderInlines(containerInline, sb);
+                RenderInlines(containerInline, sb, cell);
                 break;
 
             default:
@@ -538,31 +824,35 @@ internal static class MarkdownLatexRenderer
         var result = new StringBuilder(text.Length);
         foreach (var ch in text)
         {
-            var s = ch.ToString();
-            if (UnicodeMap.TryGetValue(s, out var mapped))
-            {
-                result.Append(mapped);
-                continue;
-            }
-
-            result.Append(ch switch
-            {
-                '\\' => @"\textbackslash{}",
-                '$' => @"\$",
-                '&' => @"\&",
-                '%' => @"\%",
-                '#' => @"\#",
-                '_' => @"\_",
-                '{' => @"\{",
-                '}' => @"\}",
-                '~' => @"\textasciitilde{}",
-                '^' => @"\textasciicircum{}",
-                // Drop characters above Latin Extended-B (U+024F) that have no mapping
-                // This prevents pdflatex from crashing on unsupported Unicode
-                _ when ch > '\u024F' => "",
-                _ => s
-            });
+            result.Append(EscapeLatex(ch));
         }
         return result.ToString();
+    }
+
+    private static string EscapeLatex(char ch)
+    {
+        var s = ch.ToString();
+        if (UnicodeMap.TryGetValue(s, out var mapped))
+        {
+            return mapped;
+        }
+
+        return ch switch
+        {
+            '\\' => @"\textbackslash{}",
+            '$' => @"\$",
+            '&' => @"\&",
+            '%' => @"\%",
+            '#' => @"\#",
+            '_' => @"\_",
+            '{' => @"\{",
+            '}' => @"\}",
+            '~' => @"\textasciitilde{}",
+            '^' => @"\textasciicircum{}",
+            // Drop characters above Latin Extended-B (U+024F) that have no mapping
+            // This prevents pdflatex from crashing on unsupported Unicode
+            _ when ch > '\u024F' => "",
+            _ => s
+        };
     }
 }

@@ -70,6 +70,27 @@ public class LatexFormatConverterTests
         Assert.Equal("/output/file.tex", writtenPath);
     }
 
+    [Theory]
+    [InlineData("asymmetric-3col")]
+    [InlineData("wide-6col")]
+    [InlineData("dense-13col")]
+    public async Task ConvertAsync_Table_WritesTheWidthSafeRendererOutput(string fixture)
+    {
+        var md = LatexTableFixtures.Read(fixture);
+        string? writtenContent = null;
+        _fsMock.Setup(f => f.WriteAllTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, content, _) => writtenContent = content)
+            .Returns(Task.CompletedTask);
+        _fsMock.Setup(f => f.GetFileSize(It.IsAny<string>())).Returns(0);
+
+        var result = await _sut.ConvertAsync(MakeRequest(md, Path.Combine(Path.GetTempPath(), "mdconv-tests", "table.tex")));
+
+        Assert.True(result.Success);
+        Assert.Equal(MarkdownLatexRenderer.Render(md), writtenContent);
+        var table = LatexTableSource.Single(writtenContent!);
+        Assert.True(table.TotalWidthSp(LatexTableSource.DocumentLineWidthSp) <= LatexTableSource.DocumentLineWidthSp);
+    }
+
     private static ConversionRequest MakeRequest(string md, string outputPath) =>
         new()
         {
