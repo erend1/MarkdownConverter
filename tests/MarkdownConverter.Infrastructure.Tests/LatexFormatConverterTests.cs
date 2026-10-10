@@ -83,7 +83,7 @@ public class LatexFormatConverterTests
             .Returns(Task.CompletedTask);
         _fsMock.Setup(f => f.GetFileSize(It.IsAny<string>())).Returns(0);
 
-        var result = await _sut.ConvertAsync(MakeRequest(md, Path.Combine(Path.GetTempPath(), "mdconv-tests", "table.tex")));
+        var result = await _sut.ConvertAsync(MakeRequest(md, Path.Combine(Path.GetTempPath(), "table.tex")));
 
         Assert.True(result.Success);
         Assert.Equal(MarkdownLatexRenderer.Render(md), writtenContent);

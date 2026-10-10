@@ -573,8 +573,8 @@ internal static class MarkdownLatexRenderer
 
     private static bool IsBreakingSpace(char ch) => ch is ' ' or '\t' or '\n' or '\r';
 
-    // Characters the escaper leaves out take no room
-    private static bool IsDropped(char ch) => EscapeLatex(ch).Length == 0;
+    // Characters the escaper leaves out take no room; it keeps everything up to Latin Extended-B
+    private static bool IsDropped(char ch) => ch > '\u024F' && EscapeLatex(ch).Length == 0;
 
     /// <summary>
     /// Escapes table-cell text. A token that cannot fit its column on one line may break

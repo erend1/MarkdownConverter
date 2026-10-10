@@ -150,7 +150,7 @@ public class PdfLatexFormatConverterTests
             .Callback<string, string, CancellationToken>((_, content, _) => exportedSource = content)
             .Returns(Task.CompletedTask);
 
-        var outputDirectory = Path.Combine(Path.GetTempPath(), "mdconv-tests");
+        var outputDirectory = Path.GetTempPath();
         await _sut.ConvertAsync(MakeRequest(md, Path.Combine(outputDirectory, "table.pdf")));
         await new LatexFormatConverter(latexFs.Object).ConvertAsync(new ConversionRequest
         {
