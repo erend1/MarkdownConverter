@@ -126,16 +126,75 @@ window.domBridge = {
     // (Ctrl+Z) intact — assigning `el.value = ...` wipes the undo history.
     // We preserve the user's previous focus so the find input keeps focus
     // when this is invoked from a find/replace context.
+    //
+    // The application observes exactly one `input` notification per call,
+    // raised after the edit is complete. Chromium reports a multi-line
+    // insertText as one event per line fragment, so events raised by the
+    // edit itself are stopped before any other listener sees them.
     insertTextAtCursor: function (selector, text) {
         var el = document.querySelector(selector);
         if (!el) return;
         var prev = document.activeElement;
         el.focus();
-        document.execCommand('insertText', false, text);
-        if (prev && prev !== el && typeof prev.focus === 'function') {
-            prev.focus();
+        var coalesce = function (e) {
+            if (e.target === el) e.stopImmediatePropagation();
+        };
+        window.addEventListener('input', coalesce, true);
+        try {
+            insertAsOneNativeEdit();
+        } finally {
+            window.removeEventListener('input', coalesce, true);
+            if (prev && prev !== el && typeof prev.focus === 'function') {
+                prev.focus();
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Chromium applies a multi-line insertText one line at a time, so its
+        // cost grows with lines x document size and stalls for minutes on
+        // large documents. The paste-style insertHTML command inserts the
+        // same text as a single native, undoable edit. The result is checked
+        // against the exact expected value; an engine that rejects the
+        // command or alters the text falls back to plain insertText.
+        function insertAsOneNativeEdit() {
+            var start = el.selectionStart || 0;
+            var end = el.selectionEnd || 0;
+            var before = el.value;
+            if (canUsePasteStyleEdit(before, start, end)) {
+                var expected = before.substring(0, start) + text + before.substring(end);
+                var accepted = document.execCommand('insertHTML', false, escapeHtml(text));
+                if (accepted && el.value === expected) {
+                    el.selectionStart = el.selectionEnd = start + text.length;
+                    return;
+                }
+                // Take back only an edit this call made; an unchanged value
+                // means there is nothing of ours on the undo stack.
+                if (el.value !== before) {
+                    document.execCommand('undo');
+                    if (el.value !== before) {
+                        throw new Error('The editor text could not be restored after an inexact edit.');
+                    }
+                }
+                el.selectionStart = start;
+                el.selectionEnd = end;
+            }
+            document.execCommand('insertText', false, text);
+        }
+
+        function canUsePasteStyleEdit(before, start, end) {
+            // Single-line text is already one fast insertText edit.
+            if (text.indexOf('\n') < 0) return false;
+            // The HTML parser drops NUL and rewrites carriage returns.
+            if (text.indexOf('\0') >= 0 || text.indexOf('\r') >= 0) return false;
+            // Chromium's undo/redo is inexact when a paste-style edit deletes
+            // the document's final line break.
+            return !(end > start && end === before.length
+                && before.charCodeAt(end - 1) === 10);
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
     },
 
     // Plain focus — single line. Kept as a primitive because Blazor cannot
