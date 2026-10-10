@@ -47,6 +47,19 @@ CI performs a clean restore, Release build, and complete test run. A local resul
 - Do not move algorithm coverage exclusively into slow browser tests.
 - Do not hide flaky ownership or synchronization with broad retries.
 
+## Compiled LaTeX checks
+
+A `pdflatex` exit code of zero says nothing about layout. `LatexTableCompilationTests` therefore compile the table fixtures under `tests/MarkdownConverter.Infrastructure.Tests/Fixtures/LatexTables` and check the result: no `Overfull \hbox` in the log, and text (`pdftotext -bbox`) and ink (`pdftoppm` raster) inside the page margins on every page.
+
+These tests need `pdflatex`, `pdftotext` and `pdftoppm` on `PATH`. Where a tool is missing they are reported as skipped with the missing tool as the reason, never as passed. CI has no TeX distribution, so a change to LaTeX table layout needs a local run, recorded in the pull request with the TeX version and the tested SHA.
+
+Set `MDCONVERT_LATEX_ARTIFACTS` to a directory to keep the generated `.tex`, `.log` and `.pdf` files for inspection:
+
+```powershell
+$env:MDCONVERT_LATEX_ARTIFACTS = Join-Path $env:TEMP 'latex-table-artifacts'
+dotnet test tests/MarkdownConverter.Infrastructure.Tests/MarkdownConverter.Infrastructure.Tests.csproj --configuration Release --filter "FullyQualifiedName~LatexTableCompilationTests"
+```
+
 ## Browser and manual validation
 
 The repository does not yet contain a Playwright suite. Until one is introduced through an approved issue, changes involving browser mechanics must document focused manual evidence. Browser automation becomes mandatory for scenarios covered by that suite once it is present.

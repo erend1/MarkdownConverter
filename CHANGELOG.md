@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept tables in LaTeX and PDF exports inside the page margins. Column widths now account for cell padding and rules, follow the cell contents, and let long URLs, identifiers, code and hashes wrap inside their cells; tables with more than ten columns use tighter cell padding.
+
 ## [0.1.0-beta.1] - 2026-08-14
 
 This beta combines the stabilized editor find/replace workflow with the responsive Ink & Paper workspace for broader desktop, tablet, and mobile validation.
