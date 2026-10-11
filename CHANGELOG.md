@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Replace All freezing the shared WebApp editor for seconds to minutes on larger documents. A replacement is now applied as one native, undoable browser edit and processed once, instead of once per inserted line, and Replace All rewrites only the span that contains matches, so redo is exact for documents that end with a line break. Replace, Find navigation, and typing in large documents are also faster because document statistics are no longer recomputed on every editor render.
+
 ## [0.1.0-beta.1] - 2026-08-14
 
 This beta combines the stabilized editor find/replace workflow with the responsive Ink & Paper workspace for broader desktop, tablet, and mobile validation.

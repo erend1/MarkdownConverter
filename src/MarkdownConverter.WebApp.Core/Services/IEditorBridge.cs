@@ -48,9 +48,11 @@ public interface IEditorBridge
 
     /// <summary>
     /// Inserts text at the current cursor position of the matched element,
-    /// using <c>document.execCommand('insertText', …)</c> so the browser's
-    /// native undo stack is preserved. The previously focused element is
-    /// restored after the edit.
+    /// replacing any selection, as one native undoable edit through
+    /// <c>document.execCommand</c> so the browser's native undo stack is
+    /// preserved. The element raises exactly one <c>input</c> notification
+    /// per call, however the browser applies the edit, and the previously
+    /// focused element is restored after the edit.
     /// </summary>
     ValueTask InsertTextAtCursorAsync(string selector, string text);
 

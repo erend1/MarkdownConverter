@@ -167,14 +167,20 @@ public sealed class FindPresenter : IFindPresenter
         }
         if (matches.Count == 0) return new FindReplaceResult();
 
-        var newText = BuildReplacedText(text, matches, replacement);
+        // Single undoable edit: select the span from the first match to the
+        // last one, then insertText with that span's replacement. Preserves
+        // the browser undo stack. Text outside the span is never rewritten,
+        // which keeps the native edit as small as the matches allow and
+        // leaves the document's final line break alone unless a match
+        // contains it — browsers redo an edit that deletes it inexactly.
+        var spanStart = matches[0].Start;
+        var spanEnd = matches[^1].End;
+        var newSpanText = BuildReplacedSpan(text, matches, replacement);
 
-        // Single undoable edit: select the entire textarea, then insertText
-        // with the replacement document. Preserves the browser undo stack.
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
-        await _bridge.SetSelectionAsync(selector, 0, text.Length);
+        await _bridge.SetSelectionAsync(selector, spanStart, spanEnd);
         if (!IsCurrent(generation)) return FindReplaceResult.Stale;
-        await _bridge.InsertTextAtCursorAsync(selector, newText);
+        await _bridge.InsertTextAtCursorAsync(selector, newSpanText);
 
         ResetAfterDocumentEdit();
         return IsCurrent(generation)
@@ -317,18 +323,23 @@ public sealed class FindPresenter : IFindPresenter
         _seededFromCaret = false;
     }
 
-    private static string BuildReplacedText(
+    /// <summary>
+    /// Builds the replacement for the span that starts at the first match
+    /// and ends at the last one. <paramref name="matches"/> must be
+    /// non-empty, ordered and non-overlapping, as <see cref="FindEngine"/>
+    /// returns them.
+    /// </summary>
+    private static string BuildReplacedSpan(
         string text, IReadOnlyList<TextMatch> matches, string replacement)
     {
-        var sb = new StringBuilder(text.Length);
-        var cursor = 0;
+        var cursor = matches[0].Start;
+        var sb = new StringBuilder(matches[^1].End - cursor);
         foreach (var m in matches)
         {
             if (m.Start > cursor) sb.Append(text, cursor, m.Start - cursor);
             sb.Append(replacement);
             cursor = m.End;
         }
-        if (cursor < text.Length) sb.Append(text, cursor, text.Length - cursor);
         return sb.ToString();
     }
 }
