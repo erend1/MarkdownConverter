@@ -296,6 +296,39 @@ public class MarkdownLatexRendererTableTests
             @"\texttt{e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}", result);
     }
 
+    [Fact]
+    public void Table_FormulaBesideACitation_GetsTheRoomItCannotDoWithout()
+    {
+        // Sixty letters without an operator are about 350pt wide and cannot break.
+        const string formula = "$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA$";
+        static LatexTableSource Table(string source) => LatexTableSource.Single(
+            MarkdownLatexRenderer.Render($"| Formula | Source |\n|---------|--------|\n| {formula} | {source} |\n"));
+
+        var withCitation = Table("[@smith2023]");
+
+        // A citation is a word like any other, so it gives way as "Smith 2023" does.
+        Assert.Equal(Table("Smith 2023").Shares, withCitation.Shares);
+        Assert.True(withCitation.ColumnWidthsSp(LatexTableSource.DocumentLineWidthSp)[0] > 350 * LatexTableSource.PointSp);
+        Assert.Equal(@"\cite{smith2023}", withCitation.Rows[1][1]);
+    }
+
+    [Fact]
+    public void Table_CitationColumnsBesideAFormula_DoNotStarveTheTextColumn()
+    {
+        const string md =
+            "| Method | Estimator | A | B | C | D | E |\n" +
+            "|---|---|---|---|---|---|---|\n" +
+            @"| Ordinary least squares | $\hat{\beta}=\frac{\sum_{i}(x_i-\bar{x})(y_i-\bar{y})}{\sum_{i}(x_i-\bar{x})^2}$ | [@a2001] | [@b2002] | [@c2003] | [@d2004] | [@e2005] |" + "\n";
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+        var widths = table.ColumnWidthsSp(LatexTableSource.DocumentLineWidthSp);
+
+        // The formula and the five citations used to leave the first column 0.7em.
+        Assert.All(widths, width => Assert.True(width > 2.9 * 10.95 * LatexTableSource.PointSp));
+        Assert.Equal(widths[2], widths[0]);
+        Assert.Equal("Ordinary least squares", LatexTableSource.WithoutBreaks(table.Rows[1][0]));
+        Assert.Equal(@"\cite{a2001}", table.Rows[1][2]);
+    }
+
     // --- Content that cannot wrap by itself ---
 
     [Fact]
@@ -402,12 +435,37 @@ public class MarkdownLatexRendererTableTests
     [InlineData(
         "offset=-0.000000001;scale=+1.000000001;limit=(-1.5,+1.5)",
         @"offset=\allowbreak{}-0.000000001;\allowbreak{}scale=\allowbreak{}+1.000000001;\allowbreak{}limit=\allowbreak{}(-1.5,\allowbreak{}+1.5)")]
-    public void Table_SignOrDashesThatStartAnItem_StayWithIt(string token, string expected)
+    [InlineData(
+        "(.125,.250,.375,.500,.625,.750,.875,.999,.111,.222,.333,.444)",
+        @"(.125,\allowbreak{}.250,\allowbreak{}.375,\allowbreak{}.500,\allowbreak{}.625,\allowbreak{}.750,\allowbreak{}.875,\allowbreak{}.999,\allowbreak{}.111,\allowbreak{}.222,\allowbreak{}.333,\allowbreak{}.444)")]
+    [InlineData(
+        "name=.gitignore;path=.github/workflows;framework=.NET;ratio=.75",
+        @"name=\allowbreak{}.gitignore;\allowbreak{}path=\allowbreak{}.github/\allowbreak{}workflows;\allowbreak{}framework=\allowbreak{}.NET;\allowbreak{}ratio=\allowbreak{}.75")]
+    [InlineData(
+        "alpha=>beta;gamma=>delta;epsilon=>zeta;eta=>theta;iota=>kappa;lambda=>mu",
+        @"alpha=>\allowbreak{}beta;\allowbreak{}gamma=>\allowbreak{}delta;\allowbreak{}epsilon=>\allowbreak{}zeta;\allowbreak{}eta=>\allowbreak{}theta;\allowbreak{}iota=>\allowbreak{}kappa;\allowbreak{}lambda=>\allowbreak{}mu")]
+    public void Table_BreakAfterASeparator_KeepsWhatFollowsWhole(string token, string expected)
     {
-        // A break after the comma, semicolon or equals sign, not between a sign and its number.
+        // A break after the comma, semicolon or equals sign: not between a sign or a leading
+        // point and what it belongs to, and not inside "=>".
         var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(token))).Rows[1][1];
 
         Assert.Equal(expected, cell);
+    }
+
+    [Theory]
+    [InlineData("$n$......................................................................42")]
+    [InlineData("......................................................................$n$")]
+    [InlineData("(((((((((((((((((((((((((((((($x$))))))))))))))))))))))))))))))")]
+    public void Table_PunctuationGluedToAFormula_MayBreakBetweenItsCharacters(string token)
+    {
+        // The formula keeps the characters on either side of it; the rest of the run may break.
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(token))).Rows[1][1];
+
+        Assert.Equal(token, LatexTableSource.WithoutBreaks(cell));
+        Assert.DoesNotContain(@"$\allowbreak{}", cell);
+        Assert.DoesNotContain(@"\allowbreak{}$", cell);
+        Assert.All(cell.Split(@"\allowbreak{}"), piece => Assert.InRange(piece.Length, 2, 14));
     }
 
     [Fact]
@@ -423,6 +481,28 @@ public class MarkdownLatexRendererTableTests
         Assert.Contains(@"\allowbreak{}", cell);
         Assert.Contains("--", cell);
         Assert.Equal("1990--1995", LatexTableSource.WithoutBreaks(cell));
+    }
+
+    [Theory]
+    [InlineData("1990--1995", @"1\allowbreak{}9\allowbreak{}9\allowbreak{}0\allowbreak{}--\allowbreak{}1\allowbreak{}9\allowbreak{}9\allowbreak{}5")]
+    [InlineData("a---b", @"a\allowbreak{}---\allowbreak{}b")]                                                           // an em dash
+    [InlineData("x>>y", @"x\allowbreak{}>>\allowbreak{}y")]                                                             // a guillemet
+    [InlineData(@"1990-\-1995", @"1\allowbreak{}9\allowbreak{}9\allowbreak{}0\allowbreak{}--\allowbreak{}1\allowbreak{}9\allowbreak{}9\allowbreak{}5")]
+    [InlineData("a----b", @"a\allowbreak{}-\allowbreak{}-\allowbreak{}-\allowbreak{}-\allowbreak{}b")]                  // a rule
+    [InlineData("a++==b", @"a\allowbreak{}+\allowbreak{}+\allowbreak{}=\allowbreak{}=\allowbreak{}b")]
+    [InlineData("a//b..c", @"a\allowbreak{}/\allowbreak{}/\allowbreak{}b\allowbreak{}.\allowbreak{}.\allowbreak{}c")]
+    [InlineData("a-`-b`", @"a\allowbreak{}-\texttt{\allowbreak{}-\allowbreak{}b}")]                                     // two fonts
+    public void Table_BreakMarks_SplitOnlyWhatIsNotALigature(string text, string expected)
+    {
+        // Sixty columns leave less than a character a line, so a mark goes wherever it may.
+        // Two or three dashes, quotes, commas or angle brackets in a row are one glyph;
+        // a longer run, other doubled characters and characters in two fonts are not.
+        var header = "|" + string.Concat(Enumerable.Repeat(" H |", 60));
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 60));
+        var row = $"| {text} |" + string.Concat(Enumerable.Repeat(" 1 |", 59));
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render($"{header}\n{divider}\n{row}\n")).Rows[1][0];
+
+        Assert.Equal(expected, cell);
     }
 
     [Theory]
@@ -635,6 +715,43 @@ public class MarkdownLatexRendererTableTests
         Assert.Equal(rowCount + 1, table.Rows.Count);
     }
 
+    [Theory]
+    [InlineData(4, 20, 10, null)]       // 4,116 characters
+    [InlineData(5, 30, 100, 8)]         // 2,495 characters a row
+    [InlineData(20, 19, 80, 2)]         // 400 cells, 7,980 characters a row
+    [InlineData(2, 3, 3000, 1)]         // 29,998 characters a row
+    public void Table_WithMuchText_IsTypesetAboutTwentyThousandCharactersAtATime(
+        int columnCount, int rowCount, int wordsPerCell, int? expectedChunk)
+    {
+        // Four hundred cells are few, but not when each of them holds a paragraph.
+        var text = string.Join(" ", Enumerable.Repeat("word", wordsPerCell));
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", columnCount));
+        var row = "|" + string.Concat(Enumerable.Repeat($" {text} |", columnCount));
+        var md = string.Join("\n", Enumerable.Repeat(row, rowCount).Prepend(divider).Prepend(row)) + "\n";
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+
+        Assert.True(columnCount * (rowCount + 1) <= 400);
+        Assert.Equal(expectedChunk, table.ChunkRows);
+        Assert.Equal(rowCount + 1, table.Rows.Count);
+    }
+
+    [Fact]
+    public void Table_WithAFewLongRows_IsChunkedForThem()
+    {
+        // The average row is short; the three long ones in a row decide.
+        var longText = string.Join(" ", Enumerable.Repeat("word", 400));
+        string Row(string text) => $"| {text} | {text} | {text} | {text} |";
+        var rows = Enumerable.Repeat(Row("short"), 40)
+            .Concat(Enumerable.Repeat(Row(longText), 3))
+            .Concat(Enumerable.Repeat(Row("short"), 40));
+        var md = string.Join("\n", rows.Prepend("|---|---|---|---|").Prepend(Row("Header"))) + "\n";
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+
+        // 7,996 characters a long row: two of them are a chunk, three are not.
+        Assert.Equal(2, table.ChunkRows);
+        Assert.Equal(84, table.Rows.Count);
+    }
+
     // --- Tables inside quotes, callouts and lists ---
 
     [Fact]
@@ -681,6 +798,7 @@ public class MarkdownLatexRendererTableTests
         Assert.Equal(10, table.Columns.Count);
         Assert.Equal(expectedPadding, table.CellPadding);
     }
+
     [Fact]
     public void Table_InsideManyNestedQuotes_StillHasAPositiveBudget()
     {

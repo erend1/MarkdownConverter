@@ -35,8 +35,11 @@ internal static class LatexTableLayout
     private const double CompactPaddingPt = 3;
 
     // longtable typesets a table in chunks of rows and holds a chunk in memory twice. A
-    // table of more than this many cells gets chunks of at most this many cells and rows.
+    // table with more cells or more text than this gets chunks of at most this size. A
+    // character costs TeX ten to a hundred words of memory, the more the narrower its
+    // column, and a document has about three million words to spare.
     private const int MaxChunkCells = 400;
+    private const int MaxChunkCharacters = 20000;
     private const int MaxChunkRows = 20;
 
     // No column is planned narrower than this while the table has room for it.
@@ -117,6 +120,7 @@ internal static class LatexTableLayout
         double budget = BudgetEm(count, density, hasRules, lineWidthPt);
 
         // What a column asks for, most pressing first. Each array includes the one before.
+        var least = new double[count];          // its longest word, as far as the minimum width goes
         var rigid = new double[count];          // its widest formula part, which cannot break
         var word = new double[count];           // its longest word, which should not have to
         var comfortable = new double[count];    // at least the minimum width
@@ -125,24 +129,26 @@ internal static class LatexTableLayout
         double rigidCap = Math.Max(0, budget - (count - 1) * ComfortableColumnWidthEm);
         for (int i = 0; i < count; i++)
         {
-            rigid[i] = Math.Min(unbreakableEm[i] * WidthSafetyFactor, rigidCap);
-            word[i] = Math.Max(rigid[i], Math.Min(widestWordEm[i] * WidthSafetyFactor, ProtectedWordCapEm));
+            double longestWord = Math.Min(widestWordEm[i] * WidthSafetyFactor, ProtectedWordCapEm);
+            least[i] = Math.Min(longestWord, MinColumnWidthEm);
+            rigid[i] = Math.Max(least[i], Math.Min(unbreakableEm[i] * WidthSafetyFactor, rigidCap));
+            word[i] = Math.Max(rigid[i], longestWord);
             comfortable[i] = Math.Max(word[i], MinColumnWidthEm);
             natural[i] = Math.Max(comfortable[i], Math.Min(naturalEm[i] * WidthSafetyFactor, budget));
             full[i] = Math.Max(natural[i], budget);
         }
 
-        double[] widths;
-        if (natural.Sum() <= budget)
-            widths = Level(natural, full, budget);              // room to spare: widen the narrowest columns
-        else if (comfortable.Sum() <= budget)
-            widths = Level(comfortable, natural, budget);       // wrap the widest columns
-        else if (word.Sum() <= budget)
-            widths = Level(word, comfortable, budget);          // dense: give up the minimum width
-        else if (rigid.Sum() <= budget)
-            widths = Level(rigid, word, budget);                // denser: break the longest words
-        else
-            widths = Enumerable.Repeat(budget / count, count).ToArray();
+        // Every column gets the most demanding request the table has room for, and the
+        // rest of the line is shared on the way to the next one: with room to spare the
+        // narrowest columns are widened, without it the widest are wrapped, then the
+        // minimum width is given up, then the longest words are broken.
+        double[][] requests = [new double[count], least, rigid, word, comfortable, natural, full];
+        int granted = requests.Length - 2;
+        while (requests[granted].Sum() > budget)
+        {
+            granted--;
+        }
+        double[] widths = Level(requests[granted], requests[granted + 1], budget);
 
         // TeX stores a decimal factor in units of 2^-16 and may round it up by half a
         // unit, so the shares leave that much of the budget unused.
@@ -161,13 +167,39 @@ internal static class LatexTableLayout
     }
 
     /// <summary>
-    /// The <c>\LTchunksize</c> for a large table, or null to keep the package default.
-    /// Column widths are fixed, so the chunk size changes memory use and nothing else.
+    /// The <c>\LTchunksize</c> for a table with many cells or much text, given the number
+    /// of characters in each of its rows, or null to keep the package default. Column
+    /// widths are fixed, so the chunk size changes memory use and nothing else.
     /// </summary>
-    public static string? ChunkRows(int columnCount, int rowCount) =>
-        (long)columnCount * rowCount <= MaxChunkCells
-            ? null
-            : Math.Clamp(MaxChunkCells / columnCount, 1, MaxChunkRows).ToString(CultureInfo.InvariantCulture);
+    public static string? ChunkRows(int columnCount, IReadOnlyList<long> rowCharacters)
+    {
+        if ((long)columnCount * rowCharacters.Count <= MaxChunkCells && rowCharacters.Sum() <= MaxChunkCharacters)
+        {
+            return null;
+        }
+
+        // As many rows as stay within the limits wherever in the table they are
+        int rows = Math.Clamp(MaxChunkCells / columnCount, 1, MaxChunkRows);
+        while (rows > 1 && MostCharacters(rowCharacters, rows) > MaxChunkCharacters)
+        {
+            rows--;
+        }
+        return rows.ToString(CultureInfo.InvariantCulture);
+    }
+
+    // The most characters that any run of so many consecutive rows holds
+    private static long MostCharacters(IReadOnlyList<long> rowCharacters, int rows)
+    {
+        long most = 0;
+        long sum = 0;
+        for (int i = 0; i < rowCharacters.Count; i++)
+        {
+            sum += rowCharacters[i];
+            if (i >= rows) sum -= rowCharacters[i - rows];
+            most = Math.Max(most, sum);
+        }
+        return most;
+    }
 
     /// <summary>
     /// Whether text of the estimated width can be set on one line of a column.
@@ -247,8 +279,9 @@ internal static class LatexTableLayout
                     bool begins = tex[start] == 'b';
                     depth += begins ? 1 : -1;
                     afterOperand = !begins;
-                    int close = end < tex.Length && tex[end] == '{' ? tex.IndexOf('}', end) : -1;
-                    i = close >= 0 ? close : end - 1;
+                    int close = end < tex.Length && tex[end] == '{' ? end + 1 : tex.Length;
+                    while (close < tex.Length && (char.IsAsciiLetter(tex[close]) || tex[close] == '*')) close++;
+                    i = close < tex.Length && tex[close] == '}' ? close : end - 1;
                 }
                 else
                 {
@@ -433,12 +466,16 @@ internal static class LatexTableLayout
             _pendingSpace = widthEm;
         }
 
-        /// <summary>Adds content such as a formula, of which only a part must stay on one line.</summary>
-        public void AddBox(double widthEm, double unbreakableEm)
+        /// <summary>
+        /// Adds content that is emitted as a whole and of which only a part has to stay on
+        /// one line. A formula is rigid: nothing can be done about a part that does not
+        /// fit. A citation is not: its part is a word like any other.
+        /// </summary>
+        public void AddBox(double widthEm, double partEm, bool rigid)
         {
-            AddGlyph(unbreakableEm);
-            NaturalEm += widthEm - unbreakableEm;
-            UnbreakableEm = Math.Max(UnbreakableEm, unbreakableEm);
+            AddGlyph(partEm);
+            NaturalEm += widthEm - partEm;
+            if (rigid) UnbreakableEm = Math.Max(UnbreakableEm, partEm);
         }
     }
 }

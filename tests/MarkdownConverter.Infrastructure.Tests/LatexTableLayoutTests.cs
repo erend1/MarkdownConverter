@@ -154,6 +154,34 @@ public class LatexTableLayoutTests
     }
 
     [Fact]
+    public void Plan_SeveralColumnsWithFormulas_LeaveTheOthersTheirMinimumWidth()
+    {
+        // Seven columns: a wide formula, five small ones and a column of plain words.
+        double[] words = [4, 20, 3.2, 3.2, 3.2, 3.2, 3.2];
+        double[] formulas = [0, 20, 3.2, 3.2, 3.2, 3.2, 3.2];
+        var plan = LatexTableLayout.Plan(words, words, formulas);
+
+        // The small formulas fit, the wide one takes what is left, and the words keep 2em.
+        Assert.Equal(2, plan.ColumnWidthEm(0), 1);
+        Assert.True(plan.ColumnWidthEm(1) > 12);
+        for (int column = 2; column < 7; column++)
+        {
+            Assert.True(LatexTableLayout.Fits(3.2, plan.ColumnWidthEm(column)));
+        }
+    }
+
+    [Fact]
+    public void Plan_WhenFormulasCannotAllFit_OnlyTheWidestGoesShort()
+    {
+        // Formulas of 30em and 12em in a line that has 39em for them.
+        double[] formulas = [30, 12];
+        var plan = LatexTableLayout.Plan(formulas, formulas, formulas);
+
+        Assert.True(LatexTableLayout.Fits(12, plan.ColumnWidthEm(1)));
+        Assert.InRange(plan.ColumnWidthEm(0), 26.0, 26.3);
+    }
+
+    [Fact]
     public void Plan_WhenWordsCannotAllFit_ShortensTheLongestWordsFirst()
     {
         // Ten columns have about 30em between them; these words ask for more.
@@ -267,15 +295,39 @@ public class LatexTableLayoutTests
     // --- Chunks ---
 
     [Theory]
-    [InlineData(4, 100, null)]      // 400 cells: the package default is fine
-    [InlineData(4, 101, "20")]
-    [InlineData(2, 1000, "20")]     // never more than twenty rows
-    [InlineData(40, 200, "10")]     // about 400 cells
-    [InlineData(100, 50, "4")]
-    [InlineData(600, 3, "1")]
-    public void ChunkRows_BoundsTheCellsTypesetAtOnce(int columnCount, int rowCount, string? expected)
+    [InlineData(4, 100, 5000, null)]        // 400 cells of little text: the package default is fine
+    [InlineData(4, 101, 5000, "20")]
+    [InlineData(2, 1000, 5000, "20")]       // never more than twenty rows
+    [InlineData(40, 200, 5000, "10")]       // about 400 cells
+    [InlineData(100, 50, 5000, "4")]
+    [InlineData(600, 3, 5000, "1")]
+    [InlineData(4, 100, 20000, null)]       // 20,000 characters are fine as well
+    [InlineData(4, 100, 30000, "20")]
+    [InlineData(20, 20, 192000, "2")]       // 400 cells of 480 characters: about 20,000 characters at a time
+    [InlineData(2, 10, 400000, "1")]        // one row is the least
+    public void ChunkRows_BoundsTheCellsAndTheTextTypesetAtOnce(
+        int columnCount, int rowCount, long characterCount, string? expected)
     {
-        Assert.Equal(expected, LatexTableLayout.ChunkRows(columnCount, rowCount));
+        var rows = Enumerable.Repeat(characterCount / rowCount, rowCount).ToArray();
+
+        Assert.Equal(expected, LatexTableLayout.ChunkRows(columnCount, rows));
+    }
+
+    [Fact]
+    public void ChunkRows_FollowsTheLongestRowsNotTheAverage()
+    {
+        // Ninety short rows around four long ones: the long rows alone decide the chunk.
+        long[] rows = [.. Enumerable.Repeat(40L, 45), 9000, 9000, 9000, 9000, .. Enumerable.Repeat(40L, 45)];
+
+        Assert.Equal("2", LatexTableLayout.ChunkRows(4, rows));
+    }
+
+    [Fact]
+    public void ChunkRows_OneRowIsTheSmallestChunk()
+    {
+        long[] rows = [40, 50000, 40];
+
+        Assert.Equal("1", LatexTableLayout.ChunkRows(4, rows));
     }
 
     // --- Line width of the container ---
@@ -401,11 +453,23 @@ public class LatexTableLayoutTests
         var measure = new LatexTableLayout.CellMeasure();
 
         measure.AddGlyph(1);
-        measure.AddBox(10, 4);          // a formula glued to the preceding text
+        measure.AddBox(10, 4, rigid: true);     // a formula glued to the preceding text
 
         Assert.Equal(11, measure.NaturalEm, 6);
         Assert.Equal(5, measure.WidestWordEm, 6);
         Assert.Equal(4, measure.UnbreakableEm, 6);
+    }
+
+    [Fact]
+    public void CellMeasure_Citation_CountsAsAWordNotAsUnbreakableContent()
+    {
+        var measure = new LatexTableLayout.CellMeasure();
+
+        measure.AddBox(6.2, 3.2, rigid: false);
+
+        Assert.Equal(6.2, measure.NaturalEm, 6);
+        Assert.Equal(3.2, measure.WidestWordEm, 6);
+        Assert.Equal(0, measure.UnbreakableEm, 6);
     }
 
     private static LatexTablePlan Plan(double[] naturalEm, double[] widestWordEm) =>

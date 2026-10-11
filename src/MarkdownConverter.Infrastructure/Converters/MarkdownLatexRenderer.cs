@@ -370,7 +370,8 @@ internal static class MarkdownLatexRenderer
 
         // p{width} columns sized from the cell contents. The widths are shares of what the
         // line has left after cell padding and rules, so the table cannot exceed the line.
-        var plan = PlanTable(table, columnCount, lineWidthPt);
+        var rowCharacters = new List<long>(rowCount);
+        var plan = PlanTable(table, columnCount, lineWidthPt, rowCharacters);
 
         var alignments = new string[columnCount];
         for (int i = 0; i < columnCount; i++)
@@ -392,7 +393,7 @@ internal static class MarkdownLatexRenderer
         }
 
         // Settings that hold for this table only
-        var chunkRows = LatexTableLayout.ChunkRows(columnCount, rowCount);
+        var chunkRows = LatexTableLayout.ChunkRows(columnCount, rowCharacters);
         bool hasSettings = plan.CellPadding != null || chunkRows != null;
         if (hasSettings)
         {
@@ -458,7 +459,8 @@ internal static class MarkdownLatexRenderer
         sb.AppendLine();
     }
 
-    private static LatexTablePlan PlanTable(Table table, int columnCount, double lineWidthPt)
+    // Plans the columns of a table and counts the characters of each of its rows.
+    private static LatexTablePlan PlanTable(Table table, int columnCount, double lineWidthPt, List<long> rowCharacters)
     {
         var natural = new double[columnCount];
         var widestWord = new double[columnCount];
@@ -470,17 +472,21 @@ internal static class MarkdownLatexRenderer
             if (row is TableRow tableRow)
             {
                 int column = 0;
+                long characters = 0;
                 foreach (var cell in tableRow)
                 {
                     if (cell is TableCell tableCell)
                     {
-                        var measure = MeasureCell(CollectCellPieces(tableCell, bold: isHeader));
+                        var pieces = CollectCellPieces(tableCell, bold: isHeader);
+                        characters += pieces.Sum(piece => piece.Text.Length);
+                        var measure = MeasureCell(pieces);
                         natural[column] = Math.Max(natural[column], measure.NaturalEm);
                         widestWord[column] = Math.Max(widestWord[column], measure.WidestWordEm);
                         unbreakable[column] = Math.Max(unbreakable[column], measure.UnbreakableEm);
                         column++;
                     }
                 }
+                rowCharacters.Add(characters);
                 isHeader = false;
             }
         }
@@ -493,7 +499,8 @@ internal static class MarkdownLatexRenderer
     /// takes no break opportunities, such as a formula.
     /// </summary>
     private readonly record struct CellPiece(
-        Inline? Source, string Text, bool Bold, bool Monospace, bool IsBox = false, double WidthEm = 0, double PartEm = 0);
+        Inline? Source, string Text, bool Bold, bool Monospace,
+        bool IsBox = false, bool IsRigid = false, double WidthEm = 0, double PartEm = 0);
 
     /// <summary>
     /// One rendered character of a cell, or a box, with the place it comes from.
@@ -565,13 +572,15 @@ internal static class MarkdownLatexRenderer
 
                 case MathInline math:
                     // Math is emitted as written; TeX breaks an inline formula only after its operators
-                    var (mathWidth, mathPart) = LatexTableLayout.MathWidthEm(math.Content.ToString());
-                    pieces.Add(Box(mathWidth, math.DelimiterCount == 2 ? mathWidth : mathPart));
+                    var tex = math.Content.ToString();
+                    var (mathWidth, mathPart) = LatexTableLayout.MathWidthEm(tex);
+                    pieces.Add(Box(tex, rigid: true, mathWidth, math.DelimiterCount == 2 ? mathWidth : mathPart));
                     break;
 
                 case CitationInline citation:
-                    // The printed form is decided by the bibliography style; assume "Author, 2023"
-                    pieces.Add(Box(6.2 * citation.Citations.Count, 3.2));
+                    // The printed form is decided by the bibliography style; assume "Author, 2023",
+                    // which TeX breaks at its spaces like any other text
+                    pieces.Add(Box("", rigid: false, 6.2 * citation.Citations.Count, 3.2));
                     break;
 
                 case LinkInline link:
@@ -598,8 +607,9 @@ internal static class MarkdownLatexRenderer
             }
         }
 
-        static CellPiece Box(double widthEm, double partEm) =>
-            new(null, "", Bold: false, Monospace: false, IsBox: true, widthEm, partEm);
+        // The source text of a box only counts towards the size of the table
+        static CellPiece Box(string text, bool rigid, double widthEm, double partEm) =>
+            new(null, text, Bold: false, Monospace: false, IsBox: true, rigid, widthEm, partEm);
     }
 
     private static string ImagePlaceholder(LinkInline image) => $"[Image: {image.Url}]";
@@ -611,7 +621,7 @@ internal static class MarkdownLatexRenderer
         {
             if (piece.IsBox)
             {
-                measure.AddBox(piece.WidthEm, piece.PartEm);
+                measure.AddBox(piece.WidthEm, piece.PartEm, piece.IsRigid);
                 continue;
             }
 
@@ -691,7 +701,7 @@ internal static class MarkdownLatexRenderer
             {
                 // "a,-1", "x=-1" and "f(-1)" break in front of the sign, which then belongs
                 // to what follows, like the punctuation that opens a token
-                bool newItem = wordBefore && OpensItem(token[i - 1]) && LeadsItem(token[i]);
+                bool newItem = wordBefore && OpensItem(token[i - 1]) && LeadsItem(token, i);
                 bool mayBreak = newItem || MayBreakBefore(token, i, wordBefore);
                 wordBefore = !newItem && (wordBefore || token[i - 1].IsWord);
                 if (!mayBreak) continue;
@@ -715,10 +725,15 @@ internal static class MarkdownLatexRenderer
 
     private static bool OpensItem(CellUnit unit) => !unit.IsBox && unit.Char is ',' or ';' or '=' or '(' or '[';
 
-    // A sign, bracket or quote that starts something, not punctuation that closes or separates
-    private static bool LeadsItem(CellUnit unit) =>
-        !unit.IsBox && !char.IsLetterOrDigit(unit.Char)
-        && unit.Char is not (')' or ']' or '}' or '.' or ':' or '!' or '?' or ',' or ';' or '=');
+    // A sign, bracket, quote or sigil that starts something, or the point of ".5" and
+    // ".NET". "=>" and "==" stay together.
+    private static bool LeadsItem(List<CellUnit> token, int index)
+    {
+        var unit = token[index];
+        if (unit.IsBox) return false;
+        if (unit.Char == '.') return index + 1 < token.Count && char.IsLetterOrDigit(token[index + 1].Char);
+        return unit.Char is '-' or '+' or '(' or '[' or '{' or '"' or '\'' or '`' or '$' or '#' or '@' or '~' or '\\' or '/';
+    }
 
     private static bool MayBreakBefore(List<CellUnit> token, int index, bool wordBeforePrevious)
     {
@@ -738,6 +753,7 @@ internal static class MarkdownLatexRenderer
             && index >= 2 && char.IsDigit(token[index - 2].Char);
         return wordBeforePrevious && !insideNumber;
     }
+
     private static void BreakPiece(List<CellUnit> token, int start, int end, double columnEm, CellBreaks breaks)
     {
         int count = end - start;
@@ -746,15 +762,26 @@ internal static class MarkdownLatexRenderer
 
         // A word breaks with a hyphen; a hash, number or code fragment breaks without one
         bool isWord = true;
+        int boxCount = 0;
+        double boxesEm = 0;
+        double widestBoxEm = 0;
         for (int i = start; i < end; i++)
         {
-            if (token[i].IsBox) return;     // a formula breaks only where TeX allows it
-            isWord &= !token[i].Monospace && char.IsLetter(token[i].Char);
+            var unit = token[i];
+            isWord &= !unit.IsBox && !unit.Monospace && char.IsLetter(unit.Char);
+            if (unit.IsBox)
+            {
+                boxCount++;
+                boxesEm += unit.WidthEm;
+                widestBoxEm = Math.Max(widestBoxEm, unit.WidthEm);
+            }
         }
         var mark = isWord ? @"\-" : BreakOpportunity;
 
-        // A line takes several chunks, so it fills well without a break mark after every character
-        double perLine = LatexTableLayout.CharactersPerLine(width, count, columnEm);
+        // A line takes several chunks, so it fills well without a break mark after every
+        // character. Next to a formula the characters have the room it leaves.
+        double perLine = LatexTableLayout.CharactersPerLine(
+            width - boxesEm, count - boxCount, Math.Max(0, columnEm - widestBoxEm));
         int step = Math.Max(1, (int)(perLine / ChunksPerLine));
 
         // Like TeX's own hyphenation, keep two characters before a break and three after it,
@@ -765,25 +792,33 @@ internal static class MarkdownLatexRenderer
 
         for (int i = first; i <= last; i++)
         {
+            // A formula breaks only where TeX allows it and keeps the character on either
+            // side of it; the rest of the punctuation around it may break
             var unit = token[start + i];
-            if (i % step == 0 && !SplitsLigature(token, start + i))
+            if (i % step == 0 && !unit.IsBox && !token[start + i - 1].IsBox && !SplitsLigature(token, start + i))
             {
                 breaks.Add(unit.Source!, unit.Index, mark);
             }
         }
     }
 
-    // "--", "---", "``", "''", "<<" and ">>" are drawn as one glyph; a mark inside would change it
+    // "--", "---", "``", "''", ",,", "<<" and ">>" are drawn as one glyph where nothing is
+    // emitted between the characters: inside one inline, or from one piece of plain text to
+    // the next. A mark inside would change it. A longer run is a rule and may break.
     private static bool SplitsLigature(List<CellUnit> token, int index)
     {
-        char ch = token[index].Char;
-        if (char.IsLetterOrDigit(ch) || token[index - 1].Char != ch) return false;
+        var unit = token[index];
+        if (unit.Char is not ('-' or '`' or '\'' or ',' or '<' or '>')) return false;
 
-        int start = index - 1;
-        while (start > 0 && token[start - 1].Char == ch) start--;
-        int end = index + 1;
-        while (end < token.Count && token[end].Char == ch) end++;
-        return end - start <= 3;
+        int before = 0;
+        for (int i = index - 1; i >= 0 && before < 3 && Continues(token[i]); i--) before++;
+        int after = 0;
+        for (int i = index; i < token.Count && after < 3 && Continues(token[i]); i++) after++;
+        return before > 0 && before + after <= 3;
+
+        bool Continues(CellUnit other) =>
+            other.Char == unit.Char
+            && (other.Source == unit.Source || (other.Source is LiteralInline && unit.Source is LiteralInline));
     }
 
     private static double WidthEm(List<CellUnit> token, int start, int end)

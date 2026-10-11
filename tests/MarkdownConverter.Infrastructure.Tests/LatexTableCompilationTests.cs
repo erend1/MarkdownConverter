@@ -342,6 +342,26 @@ public partial class LatexTableCompilationTests : IClassFixture<LatexCompilation
     }
 
     [LatexFact(LatexToolchain.PdfLatex)]
+    public async Task TextHeavyTable_FitsTexMemory()
+    {
+        // 400 cells are few enough for longtable's default, but not with eighty words in
+        // each: broken to fit twenty narrow columns, twenty such rows exhaust pdflatex.
+        var text = string.Join(" ", Enumerable.Repeat("several ordinary words that wrap inside the column", 10));
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 20));
+        var row = "|" + string.Concat(Enumerable.Repeat($" {text} |", 20));
+        var markdown = string.Join("\n", Enumerable.Repeat(row, 19).Prepend(divider).Prepend(row)) + "\n";
+
+        var tex = MarkdownLatexRenderer.Render(markdown);
+        Assert.Equal(1, LatexTableSource.Single(tex).ChunkRows);
+
+        var document = await _latex.CompileAsync("text-heavy-table", tex);
+
+        AssertCompiled(document);
+        Assert.DoesNotContain("TeX capacity exceeded", document.Log);
+        Assert.DoesNotContain("in alignment", string.Join("\n", document.OverfullBoxes.Select(box => box.Place)));
+    }
+
+    [LatexFact(LatexToolchain.PdfLatex)]
     public async Task WidthEstimates_CoverTheTypesetWidth()
     {
         string[] samples =
