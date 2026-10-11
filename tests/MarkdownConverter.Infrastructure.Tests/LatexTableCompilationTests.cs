@@ -183,6 +183,24 @@ public partial class LatexTableCompilationTests : IClassFixture<LatexCompilation
         Assert.Equal(2, Regex.Matches(text, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").Count);
     }
 
+    [LatexFact(LatexToolchain.PdfLatex, LatexToolchain.PdfToText)]
+    public async Task SplitTokenFixture_KeepsEveryCharacterAndTheSpaceAfterADroppedLetter()
+    {
+        var document = await _latex.CompileFixtureAsync("split-tokens-and-formulas");
+        AssertCompiled(document);
+
+        var raw = await LatexToolchain.ReadTextAsync(document.PdfPath);
+        var text = WhitespacePattern().Replace(raw, "");
+
+        Assert.Contains("very_long_configuration_option_name_with_many_separate_segments", text);
+        Assert.Contains("response.data.items[0].attributes.relationships[12].links.related.href", text);
+        Assert.Contains(@"C:\Users\name\AppData\Local\Temp\mdconv\output\report.tex", text);
+        Assert.Contains("first|second|third|fourth|fifth|sixth|seventh|eighth|ninth", text);
+        Assert.Contains("MarkdownConverter.Infrastructure.Converters.MarkdownLatexRenderer.RenderTable", text);
+        // The words on both sides of the dropped letter are still two words.
+        Assert.Matches(@"resistance_\s+measured", raw);
+    }
+
     [LatexFact(LatexToolchain.PdfLatex, LatexToolchain.PdfToPpm)]
     public async Task LegacyColumnSpecification_OverflowsTheLine()
     {
@@ -244,6 +262,83 @@ public partial class LatexTableCompilationTests : IClassFixture<LatexCompilation
         AssertCompiled(document);
         Assert.Empty(document.OverfullBoxes);
         AssertInsideMargins("nested-tables", await LatexToolchain.ReadInkExtentsAsync(document.PdfPath), InkTolerancePt);
+    }
+
+    [LatexFact(LatexToolchain.PdfLatex, LatexToolchain.PdfToPpm)]
+    public async Task TablesNestedTwoLevelsDeep_KeepTheirContentInsideItsCell()
+    {
+        // 55 typewriter characters: they fit the page-wide column, and only just the one a
+        // table has left two levels into lists or quotes.
+        string[] table =
+        [
+            "| Key | Value |",
+            "|-----|-------|",
+            "| type | `ConfigurationOptionsValidatorFactoryProviderBuilderBase` |",
+            "| other | short |"
+        ];
+        var markdown =
+            "- Outer item\n  - Inner item\n\n" + Indented("      ", table) + "\n" +
+            "> Outer quote\n>\n" + Indented("> > ", table) + "\n" +
+            "> A quote\n>\n> - A list item\n>\n" + Indented(">   ", table) + "\n" +
+            "- One\n  - Two\n    - Three\n\n" + Indented("        ", table);
+
+        var tex = MarkdownLatexRenderer.Render(markdown);
+        Assert.Equal(4, LatexTableSource.ParseAll(tex).Count);
+
+        var document = await _latex.CompileAsync("nested-two-levels", tex);
+
+        AssertCompiled(document);
+        Assert.Empty(document.OverfullBoxes);
+        AssertInsideMargins("nested-two-levels", await LatexToolchain.ReadInkExtentsAsync(document.PdfPath), InkTolerancePt);
+
+        static string Indented(string prefix, string[] lines) => string.Concat(lines.Select(line => prefix + line + "\n"));
+    }
+
+    [LatexFact(LatexToolchain.PdfLatex)]
+    public async Task ContainerInsets_MatchTheLineWidthTexGivesTheirContent()
+    {
+        // The planner subtracts these from the page line for a table inside a container.
+        var body = string.Join("\n",
+            @"\typeout{LINE page \the\linewidth}",
+            @"\begin{mdquote}\typeout{LINE quote \the\linewidth}x\end{mdquote}",
+            @"\begin{callout-note}\typeout{LINE callout \the\linewidth}x\end{callout-note}",
+            @"\begin{itemize}\item \typeout{LINE list \the\linewidth}x",
+            @"\begin{itemize}\item \typeout{LINE innerlist \the\linewidth}x\end{itemize}",
+            @"\end{itemize}");
+
+        var document = await _latex.CompileAsync("container-insets", DocumentWith(body));
+        Assert.Equal(0, document.ExitCode);
+
+        var line = LineWidthPattern().Matches(document.Log)
+            .GroupBy(match => match.Groups[1].Value)
+            .ToDictionary(group => group.Key, group => double.Parse(group.First().Groups[2].Value, CultureInfo.InvariantCulture));
+
+        Assert.Equal(LatexTableLayout.PageLineWidthPt, line["page"], 2);
+        Assert.Equal(line["page"] - MarkdownLatexRenderer.QuoteInsetPt, line["quote"], 1);
+        Assert.Equal(line["page"] - MarkdownLatexRenderer.CalloutInsetPt, line["callout"], 1);
+        Assert.Equal(line["page"] - MarkdownLatexRenderer.ListIndentPt, line["list"], 1);
+        // Deeper list levels are indented less; the planner may only err on the narrow side.
+        Assert.InRange(line["innerlist"] - (line["page"] - 2 * MarkdownLatexRenderer.ListIndentPt), 0, 5);
+    }
+
+    [LatexFact(LatexToolchain.PdfLatex)]
+    public async Task LargeDenseTable_FitsTexMemory()
+    {
+        // 8,000 cells whose numbers have to break. Typeset 200 rows at a time, as longtable
+        // does by default, they need more than pdflatex's five million words of memory.
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 40));
+        var rows = Enumerable.Range(0, 201).Select(row =>
+            "|" + string.Concat(Enumerable.Range(0, 40).Select(column => $" {1000 + (row * 40 + column) % 9000} |")));
+        var markdown = string.Join("\n", rows.Take(1).Append(divider).Concat(rows.Skip(1))) + "\n";
+
+        var tex = MarkdownLatexRenderer.Render(markdown);
+        Assert.Equal(10, LatexTableSource.Single(tex).ChunkRows);
+
+        var document = await _latex.CompileAsync("large-dense-table", tex);
+
+        AssertCompiled(document);
+        Assert.DoesNotContain("TeX capacity exceeded", document.Log);
+        Assert.DoesNotContain("in alignment", string.Join("\n", document.OverfullBoxes.Select(box => box.Place)));
     }
 
     [LatexFact(LatexToolchain.PdfLatex)]
@@ -347,4 +442,7 @@ public partial class LatexTableCompilationTests : IClassFixture<LatexCompilation
 
     [GeneratedRegex(@"SAMPLE (\d+) (\d) ([0-9.]+)pt")]
     private static partial Regex SampleWidthPattern();
+
+    [GeneratedRegex(@"LINE (\w+) ([0-9.]+)pt")]
+    private static partial Regex LineWidthPattern();
 }

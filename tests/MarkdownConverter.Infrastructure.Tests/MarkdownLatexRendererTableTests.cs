@@ -305,7 +305,7 @@ public class MarkdownLatexRendererTableTests
         var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(url)));
         var cell = table.Rows[1][1];
 
-        Assert.StartsWith($@"\href{{{url}}}{{https://\allowbreak example.\allowbreak org/\allowbreak very/", cell);
+        Assert.StartsWith($@"\href{{{url}}}{{https://\allowbreak{{}}example.\allowbreak{{}}org/\allowbreak{{}}very/", cell);
         Assert.Equal($@"\href{{{url}}}{{{url}}}", LatexTableSource.WithoutBreaks(cell));
     }
 
@@ -316,7 +316,7 @@ public class MarkdownLatexRendererTableTests
             NarrowColumnTable("`src/MarkdownConverter.Infrastructure/Converters/MarkdownLatexRenderer.cs`")));
 
         Assert.Equal(
-            @"\texttt{src/\allowbreak Markdown\allowbreak Converter.\allowbreak Infrastructure/\allowbreak Converters/\allowbreak Markdown\allowbreak Latex\allowbreak Renderer.\allowbreak cs}",
+            @"\texttt{src/\allowbreak{}Markdown\allowbreak{}Converter.\allowbreak{}Infrastructure/\allowbreak{}Converters/\allowbreak{}Markdown\allowbreak{}Latex\allowbreak{}Renderer.\allowbreak{}cs}",
             table.Rows[1][1]);
     }
 
@@ -327,10 +327,102 @@ public class MarkdownLatexRendererTableTests
             NarrowColumnTable("very_long_configuration_option_name_with_many_separate_segments&more%stuff#here")));
         var cell = table.Rows[1][1];
 
-        Assert.Contains(@"very\_\allowbreak long\_\allowbreak configuration\_", cell);
+        Assert.Contains(@"very\_\allowbreak{}long\_\allowbreak{}configuration\_", cell);
         Assert.Equal(
             @"very\_long\_configuration\_option\_name\_with\_many\_separate\_segments\&more\%stuff\#here",
             LatexTableSource.WithoutBreaks(cell));
+    }
+
+    [Theory]
+    [InlineData(@"very\_long\_configuration\_option\_name\_with\_many\_separate\_segments")]
+    [InlineData("response.data.items[0].attributes.relationships[12].links.related.href")]
+    [InlineData(@"C:\\Users\\name\\AppData\\Local\\Temp\\mdconv\\output\\report.tex")]
+    [InlineData("`--configuration`=`Release`;`--verbosity`=`minimal`;`--no-restore`;`--nologo`")]
+    [InlineData(@"first\|second\|third\|fourth\|fifth\|sixth\|seventh\|eighth\|ninth")]
+    [InlineData(@"SELECT\*FROM\*table\*WHERE\*identifier\*IS\*NOT\*NULL")]
+    [InlineData("**Markdown**Converter.*Infrastructure*.`LatexRenderer`.RenderTable")]
+    public void Table_TokenMadeOfSeveralInlines_BreaksLikeOneToken(string token)
+    {
+        // Markdown escapes, brackets, emphasis and code spans split a token into several
+        // inline nodes; it is still one unbreakable run for TeX.
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(token))).Rows[1][1];
+
+        Assert.Contains(@"\allowbreak{}", cell);
+        Assert.Equal(PlainCell(token), LatexTableSource.WithoutBreaks(cell));
+        Assert.All(
+            LatexTableSource.WithoutBreaks(cell.Replace(@"\allowbreak{}", "\n")).Split('\n'),
+            piece => Assert.True(piece.Length <= 40, $"No break opportunity inside '{piece}'"));
+    }
+
+    [Fact]
+    public void Table_BreakBeforeACharacterTheRendererDrops_KeepsTheFollowingSpace()
+    {
+        // The Greek letter has no glyph in the document fonts and is dropped. A mark in its
+        // place would be followed by the space, and TeX swallows a space after a command.
+        const string text = "temperature_coefficient_of_resistance_\u03b1 measured at room temperature";
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(
+            $"| Quantity | Notes | More |\n|---|---|---|\n| {text} | {Prose} | {Prose} |\n")).Rows[1][0];
+
+        Assert.Contains(@"resistance\_ measured at room temperature", cell);
+        Assert.Equal(
+            @"temperature\_coefficient\_of\_resistance\_ measured at room temperature",
+            LatexTableSource.WithoutBreaks(cell));
+    }
+
+    [Theory]
+    [MemberData(nameof(Fixtures))]
+    public void Table_BreakMarks_AlwaysStandBeforeACharacter(string fixture)
+    {
+        var tables = LatexTableSource.ParseAll(MarkdownLatexRenderer.Render(LatexTableFixtures.Read(fixture)));
+
+        Assert.All(tables.SelectMany(table => table.Rows).SelectMany(row => row), cell =>
+        {
+            Assert.DoesNotMatch(@"(\\allowbreak\{\}|\\-)(\s|\}*$)", cell);
+            Assert.DoesNotContain(@"\allowbreak{}\allowbreak{}", cell);
+        });
+    }
+
+    [Fact]
+    public void Table_TextNextToAFormula_MayBreakBesideItButNotInsideIt()
+    {
+        const string math = @"$\frac{\partial^2 u}{\partial x^2}\frac{\partial^2 v}{\partial y^2}\frac{\partial^2 w}{\partial z^2}$";
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(
+            NarrowColumnTable($"coefficient={math};term"))).Rows[1][1];
+
+        Assert.Equal($@"coefficient=\allowbreak{{}}{math};\allowbreak{{}}term", cell);
+    }
+
+    [Theory]
+    [InlineData(
+        "(-0.12,-0.34,-0.56,-0.78,-0.91,-1.23,-1.45,-1.67,-1.89,-2.01)",
+        @"(-0.12,\allowbreak{}-0.34,\allowbreak{}-0.56,\allowbreak{}-0.78,\allowbreak{}-0.91,\allowbreak{}-1.23,\allowbreak{}-1.45,\allowbreak{}-1.67,\allowbreak{}-1.89,\allowbreak{}-2.01)")]
+    [InlineData(
+        "`--configuration=Release;--verbosity=minimal;--no-restore;--nologo`",
+        @"\texttt{--configuration=\allowbreak{}Release;\allowbreak{}--verbosity=\allowbreak{}minimal;\allowbreak{}--no-\allowbreak{}restore;\allowbreak{}--nologo}")]
+    [InlineData(
+        "offset=-0.000000001;scale=+1.000000001;limit=(-1.5,+1.5)",
+        @"offset=\allowbreak{}-0.000000001;\allowbreak{}scale=\allowbreak{}+1.000000001;\allowbreak{}limit=\allowbreak{}(-1.5,\allowbreak{}+1.5)")]
+    public void Table_SignOrDashesThatStartAnItem_StayWithIt(string token, string expected)
+    {
+        // A break after the comma, semicolon or equals sign, not between a sign and its number.
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(token))).Rows[1][1];
+
+        Assert.Equal(expected, cell);
+    }
+
+    [Fact]
+    public void Table_BreakMarks_DoNotSplitADashLigature()
+    {
+        // Forty columns leave room for two characters a line, so every position is a
+        // candidate. "--" is drawn as one en dash and has to stay together.
+        var header = "|" + string.Concat(Enumerable.Repeat(" H |", 40));
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 40));
+        var row = "| 1990--1995 |" + string.Concat(Enumerable.Repeat(" 1 |", 39));
+        var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render($"{header}\n{divider}\n{row}\n")).Rows[1][0];
+
+        Assert.Contains(@"\allowbreak{}", cell);
+        Assert.Contains("--", cell);
+        Assert.Equal("1990--1995", LatexTableSource.WithoutBreaks(cell));
     }
 
     [Theory]
@@ -343,13 +435,13 @@ public class MarkdownLatexRendererTableTests
         var cell = table.Rows[1][1];
         var text = token.Trim('`');
 
-        Assert.Contains(@"\allowbreak ", cell);
+        Assert.Contains(@"\allowbreak{}", cell);
         Assert.DoesNotContain(@"\-", cell);
         Assert.Contains(text, LatexTableSource.WithoutBreaks(cell));
 
         // No run between two break opportunities is longer than a quarter of the token,
         // and none strands fewer than two characters at the start or three at the end.
-        var chunks = cell.Replace(@"\texttt{", "").TrimEnd('}').Split(@"\allowbreak ");
+        var chunks = cell.Replace(@"\texttt{", "").TrimEnd('}').Split(@"\allowbreak{}");
         Assert.True(chunks.Length >= 4);
         Assert.All(chunks, chunk => Assert.InRange(chunk.Length, 2, text.Length / 4));
         Assert.True(chunks[^1].Length >= 3);
@@ -417,7 +509,7 @@ public class MarkdownLatexRendererTableTests
         var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable($"![diagram]({url})")));
         var cell = table.Rows[1][1];
 
-        Assert.Contains(@"\allowbreak ", cell);
+        Assert.Contains(@"\allowbreak{}", cell);
         Assert.Equal($@"\textit{{[Image: {url}]}}", LatexTableSource.WithoutBreaks(cell));
     }
 
@@ -512,6 +604,97 @@ public class MarkdownLatexRendererTableTests
         Assert.All(widths.Skip(1), width => Assert.InRange(width, 1.0 * 10.95 * LatexTableSource.PointSp, 2.0 * 10.95 * LatexTableSource.PointSp));
     }
 
+    // --- Large tables ---
+
+    [Fact]
+    public void Table_OfOrdinarySize_KeepsThePackageChunkSize()
+    {
+        var result = MarkdownLatexRenderer.Render(LatexTableFixtures.Read("multipage-4col"));
+        var table = LatexTableSource.Single(result);
+
+        Assert.Equal(73, table.Rows.Count);
+        Assert.Null(table.ChunkRows);
+        Assert.False(table.IsGrouped);
+        Assert.DoesNotContain("LTchunksize", result);
+    }
+
+    [Theory]
+    [InlineData(4, 150, 20)]
+    [InlineData(40, 20, 10)]
+    [InlineData(100, 10, 4)]
+    public void Table_WithManyCells_IsTypesetAFewRowsAtATime(int columnCount, int rowCount, int expectedChunk)
+    {
+        // longtable holds a chunk of rows in memory twice; 200 rows of a wide table exhaust TeX.
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", columnCount));
+        var row = "|" + string.Concat(Enumerable.Repeat(" 1234 |", columnCount));
+        var md = string.Join("\n", Enumerable.Repeat(row, rowCount).Prepend(divider).Prepend(row)) + "\n";
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+
+        Assert.Equal(expectedChunk, table.ChunkRows);
+        Assert.True(table.IsGrouped);
+        Assert.Equal(rowCount + 1, table.Rows.Count);
+    }
+
+    // --- Tables inside quotes, callouts and lists ---
+
+    [Fact]
+    public void Table_InsideANestedList_IsPlannedForTheNarrowerLine()
+    {
+        const string table =
+            "| Key | Value |\n" +
+            "|-----|-------|\n" +
+            "| type | `ConfigurationOptionsValidatorFactoryProviderBuilderBase` |\n" +
+            "| other | short |\n";
+        var nested = "- Outer item\n  - Inner item\n\n" + string.Concat(table.Split('\n').Select(line => "      " + line + "\n"));
+
+        var onThePage = LatexTableSource.Single(MarkdownLatexRenderer.Render(table));
+        var inTheList = LatexTableSource.Single(MarkdownLatexRenderer.Render(nested));
+
+        // Two list levels leave a line of 401.5pt. Planned for the page, the code column would
+        // get four fifths of it and the 55 typewriter characters (316.2pt) would not fit.
+        long nestedLine = (long)Math.Round(401.5 * LatexTableSource.PointSp);
+        Assert.True(inTheList.Shares[1] > onThePage.Shares[1]);
+        Assert.True(inTheList.ColumnWidthsSp(nestedLine)[1] > 316.2 * LatexTableSource.PointSp);
+        Assert.True(inTheList.TotalWidthSp(nestedLine) <= nestedLine);
+        Assert.Equal(onThePage.Rows[1][1], LatexTableSource.WithoutBreaks(inTheList.Rows[1][1]));
+    }
+
+    [Theory]
+    [InlineData("quote", "3pt")]        // a block quote takes 24pt of the line
+    [InlineData("callout", "3pt")]      // a callout 23.3pt
+    [InlineData("list", "3pt")]         // a list level 27.4pt
+    [InlineData("page", null)]
+    public void Table_InsideAContainer_TightensThePaddingSooner(string container, string? expectedPadding)
+    {
+        // Ten columns are the most the page holds at the default padding.
+        var lines = ShortTable(10).TrimEnd('\n').Split('\n');
+        var md = container switch
+        {
+            "quote" => string.Concat(lines.Select(line => "> " + line + "\n")),
+            "callout" => "> [!NOTE]\n> A note.\n>\n" + string.Concat(lines.Select(line => "> " + line + "\n")),
+            "list" => "- item\n\n" + string.Concat(lines.Select(line => "  " + line + "\n")),
+            _ => string.Concat(lines.Select(line => line + "\n"))
+        };
+
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+
+        Assert.Equal(10, table.Columns.Count);
+        Assert.Equal(expectedPadding, table.CellPadding);
+    }
+    [Fact]
+    public void Table_InsideManyNestedQuotes_StillHasAPositiveBudget()
+    {
+        // Fourteen levels leave a line of 117pt, less than the padding of ten ordinary columns.
+        var prefix = string.Concat(Enumerable.Repeat("> ", 14));
+        var md = string.Concat(ShortTable(10).TrimEnd('\n').Split('\n').Select(line => prefix + line + "\n"));
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render(md));
+        long lineWidth = (long)Math.Round((452.9679 - 14 * 24) * LatexTableSource.PointSp);
+
+        Assert.Equal("0pt", table.CellPadding);
+        Assert.True(table.TotalWidthSp(lineWidth) <= lineWidth);
+        Assert.All(table.ColumnWidthsSp(lineWidth), width => Assert.True(width > 0));
+    }
+
     private static string RenderWithCulture(CultureInfo culture, string markdown)
     {
         var previous = CultureInfo.CurrentCulture;
@@ -552,10 +735,21 @@ public class MarkdownLatexRendererTableTests
         return $"| {header} |\n| {divider} |\n| {row} |\n";
     }
 
+    private const string Prose =
+        "several ordinary words that wrap several ordinary words that wrap several ordinary words that wrap " +
+        "several ordinary words that wrap several ordinary words that wrap several ordinary words that wrap";
+
     // Two wordy columns keep the middle one too narrow for a long token.
-    private static string NarrowColumnTable(string cell)
+    private static string NarrowColumnTable(string cell) =>
+        $"| Notes | Value | More |\n|-------|-------|------|\n| {Prose} | {cell} | {Prose} |\n";
+
+    // The cell as it is rendered when nothing has to break: alone in a table as wide as the page.
+    private static string PlainCell(string cell)
     {
-        var prose = string.Join(" ", Enumerable.Repeat("several ordinary words that wrap", 6));
-        return $"| Notes | Value | More |\n|-------|-------|------|\n| {prose} | {cell} | {prose} |\n";
+        var rendered = LatexTableSource.Single(MarkdownLatexRenderer.Render($"| Value |\n|---|\n| {cell} |\n")).Rows[1][0];
+
+        Assert.DoesNotContain(@"\allowbreak", rendered);
+        Assert.DoesNotContain(@"\-", rendered);
+        return rendered;
     }
 }

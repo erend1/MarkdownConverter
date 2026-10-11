@@ -252,10 +252,68 @@ public class LatexTableLayoutTests
     [InlineData('W', true, true, 0.525)]
     [InlineData('ş', false, false, 0.6)]
     [InlineData('Ç', false, false, 0.8)]
+    [InlineData('ş', false, true, 0.525)]
     [InlineData('→', false, false, 1)]
+    [InlineData('→', true, false, 1.2)]
+    [InlineData('…', false, false, 1.34)]               // three periods, wider than the other symbols
+    [InlineData('…', true, false, 1.608)]
+    [InlineData('…', false, true, 1.6)]                 // and three characters in typewriter type
+    [InlineData('×', false, true, 0.8)]                 // set in the math font even inside code
     public void CharWidthEm_FollowsTheFontTheCharacterIsSetIn(char ch, bool bold, bool monospace, double expected)
     {
         Assert.Equal(expected, LatexTableLayout.CharWidthEm(ch, bold, monospace), 4);
+    }
+
+    // --- Chunks ---
+
+    [Theory]
+    [InlineData(4, 100, null)]      // 400 cells: the package default is fine
+    [InlineData(4, 101, "20")]
+    [InlineData(2, 1000, "20")]     // never more than twenty rows
+    [InlineData(40, 200, "10")]     // about 400 cells
+    [InlineData(100, 50, "4")]
+    [InlineData(600, 3, "1")]
+    public void ChunkRows_BoundsTheCellsTypesetAtOnce(int columnCount, int rowCount, string? expected)
+    {
+        Assert.Equal(expected, LatexTableLayout.ChunkRows(columnCount, rowCount));
+    }
+
+    // --- Line width of the container ---
+
+    [Fact]
+    public void Plan_NarrowerLine_LeavesLessRoomForTheSameContent()
+    {
+        double[] natural = [3, 100, 60, 4];
+        double[] words = [3, 5, 5, 4];
+
+        var page = LatexTableLayout.Plan(natural, words, new double[4]);
+        var nestedList = LatexTableLayout.Plan(natural, words, new double[4], lineWidthPt: 401.5);
+
+        // The short columns keep their text; the wrapped ones pay for the narrower line.
+        Assert.Equal(page.ColumnWidthEm(0), nestedList.ColumnWidthEm(0), 1);
+        Assert.Equal((401.5 - 49.2) / 10.95, Enumerable.Range(0, 4).Sum(nestedList.ColumnWidthEm), 1);
+        Assert.True(nestedList.ColumnWidthEm(1) < page.ColumnWidthEm(1) - 2);
+    }
+
+    [Fact]
+    public void Plan_NarrowerLine_TightensThePaddingSooner()
+    {
+        Assert.Equal(LatexTableDensity.Normal, Plan(new double[10], new double[10]).Density);
+        Assert.Equal(
+            LatexTableDensity.Compact,
+            LatexTableLayout.Plan(new double[10], new double[10], new double[10], lineWidthPt: 428.97).Density);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-200)]
+    [InlineData(5)]
+    public void Plan_LineTooNarrowForAnything_StillYieldsPositiveShares(double lineWidthPt)
+    {
+        var plan = LatexTableLayout.Plan([4, 30, 4], [4, 5, 4], new double[3], lineWidthPt);
+
+        Assert.All(Enumerable.Range(0, 3), column => Assert.True(plan.Share(column) > 0));
+        Assert.True(Enumerable.Range(0, 3).Sum(plan.Share) < LatexTableLayout.ShareScale);
     }
 
     [Theory]
@@ -281,13 +339,24 @@ public class LatexTableLayoutTests
     [InlineData("a = b", 1.87)]                         // "a =" then "b"
     [InlineData("x^2 + y^2 = z^2", 2.42)]               // "x^2 +", "y^2 =", "z^2"
     [InlineData(@"a \leq b \times c", 1.87)]            // named operators break as well
-    [InlineData("-x", 1.87)]                            // a leading sign is not an operator
-    [InlineData("x^-1 y", 2.97)]                        // neither is the sign of an exponent
+    [InlineData("-x", 1.32)]                            // a leading sign is not an operator
+    [InlineData("x = -1", 1.87)]                        // nor is a sign after a relation
+    [InlineData("(-0.12, -0.34)", 7.59)]                // or after a bracket or comma: no break at all
+    [InlineData("x^-1 y", 2.42)]                        // or the sign of an exponent
     [InlineData(@"\frac{a + b}{c + d}", 4.84)]          // no break inside braces
     [InlineData(@"\left(a + b\right)", 3.52)]           // nor between \left and \right
+    [InlineData(@"\begin{pmatrix} a + b & c \end{pmatrix}", 2.97)]   // nor inside an environment
     public void MathWidthEm_ReportsTheWidestPartThatCannotBreak(string tex, double expected)
     {
         Assert.Equal(expected, LatexTableLayout.MathWidthEm(tex).UnbreakableEm, 4);
+    }
+
+    [Fact]
+    public void MathWidthEm_DoesNotCountTheNameOfAnEnvironment()
+    {
+        var matrix = LatexTableLayout.MathWidthEm(@"\begin{pmatrix} a & b \end{pmatrix}");
+
+        Assert.Equal(1.1, matrix.TotalEm, 4);
     }
 
     [Fact]

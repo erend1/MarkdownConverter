@@ -12,6 +12,7 @@ internal static class LatexTableFixtures
         "prose-4col",
         "wide-6col",
         "unbreakable-content",
+        "split-tokens-and-formulas",
         "alignment-and-markup",
         "dense-13col",
         "multipage-4col"

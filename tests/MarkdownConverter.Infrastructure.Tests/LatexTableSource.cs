@@ -19,11 +19,12 @@ internal sealed partial class LatexTableSource
     private static readonly long RuleWidthSp = TexDimension("0.4");
 
     private LatexTableSource(
-        IReadOnlyList<Column> columns, string? cellPadding, int ruleCount, bool isGrouped,
+        IReadOnlyList<Column> columns, string? cellPadding, int? chunkRows, int ruleCount, bool isGrouped,
         IReadOnlyList<IReadOnlyList<string>> rows)
     {
         Columns = columns;
         CellPadding = cellPadding;
+        ChunkRows = chunkRows;
         RuleCount = ruleCount;
         IsGrouped = isGrouped;
         Rows = rows;
@@ -33,6 +34,9 @@ internal sealed partial class LatexTableSource
 
     /// <summary>The <c>\tabcolsep</c> set for this table, or null for the document default.</summary>
     public string? CellPadding { get; }
+
+    /// <summary>The <c>\LTchunksize</c> set for this table, or null for the package default.</summary>
+    public int? ChunkRows { get; }
 
     /// <summary>Number of vertical rules between the columns.</summary>
     public int RuleCount { get; }
@@ -65,13 +69,22 @@ internal sealed partial class LatexTableSource
             var rest = ColumnPattern().Replace(spec[1..^1], "");
             Assert.True(rest.Replace("|", "").Trim().Length == 0, $"Unexpected text in column specification: {rest}");
 
+            // Settings for this table only sit between \begingroup and the table.
             string? padding = null;
-            bool grouped = false;
-            if (i > 0 && PaddingPattern().Match(lines[i - 1]) is { Success: true } match)
+            int? chunkRows = null;
+            int settings = i - 1;
+            if (settings >= 0 && ChunkPattern().Match(lines[settings]) is { Success: true } chunk)
+            {
+                chunkRows = int.Parse(chunk.Groups[1].Value, CultureInfo.InvariantCulture);
+                settings--;
+            }
+            if (settings >= 0 && PaddingPattern().Match(lines[settings]) is { Success: true } match)
             {
                 padding = match.Groups[1].Value;
-                grouped = i > 1 && lines[i - 2].EndsWith(@"\begingroup", StringComparison.Ordinal);
+                settings--;
             }
+            bool grouped = settings >= 0 && lines[settings].EndsWith(@"\begingroup", StringComparison.Ordinal);
+            Assert.Equal(grouped, padding is not null || chunkRows is not null);
 
             var rows = new List<IReadOnlyList<string>>();
             int end = i + 1;
@@ -86,7 +99,7 @@ internal sealed partial class LatexTableSource
             Assert.Equal(grouped, end + 1 < lines.Length && lines[end + 1] == @"\endgroup");
 
             tables.Add(new LatexTableSource(
-                declarations.Select(Column.From).ToList(), padding, rest.Count(c => c == '|'), grouped, rows));
+                declarations.Select(Column.From).ToList(), padding, chunkRows, rest.Count(c => c == '|'), grouped, rows));
             i = end;
         }
 
@@ -105,7 +118,7 @@ internal sealed partial class LatexTableSource
 
     /// <summary>The text of a cell with the break opportunities removed.</summary>
     public static string WithoutBreaks(string cell) =>
-        cell.Replace(@"\allowbreak ", "").Replace(@"\-", "");
+        cell.Replace(@"\allowbreak{}", "").Replace(@"\-", "");
 
     private long PaddingSp => CellPadding is null
         ? DefaultPaddingSp
@@ -137,6 +150,9 @@ internal sealed partial class LatexTableSource
 
     [GeneratedRegex(@"^\\setlength\{\\tabcolsep\}\{(\d+(?:\.\d+)?pt)\}$")]
     private static partial Regex PaddingPattern();
+
+    [GeneratedRegex(@"^\\LTchunksize=(\d+)\\relax$")]
+    private static partial Regex ChunkPattern();
 
     /// <summary>One column declaration of the table.</summary>
     internal sealed record Column(string Alignment, int Share, int PaddingCount, int BudgetRuleCount)

@@ -28,11 +28,16 @@ internal static class LatexTableLayout
     // Geometry of the document MarkdownLatexRenderer emits: A4 with 1in margins, 11pt
     // Latin Modern and the article-class table defaults. It only steers proportions and
     // break hints; the emitted TeX measures the real line, so another line stays safe.
-    private const double LineWidthPt = 452.97;
+    internal const double PageLineWidthPt = 452.97;
     private const double EmPt = 10.95;
     private const double RuleWidthPt = 0.4;
     private const double DefaultPaddingPt = 6;
     private const double CompactPaddingPt = 3;
+
+    // longtable typesets a table in chunks of rows and holds a chunk in memory twice. A
+    // table of more than this many cells gets chunks of at most this many cells and rows.
+    private const int MaxChunkCells = 400;
+    private const int MaxChunkRows = 20;
 
     // No column is planned narrower than this while the table has room for it.
     private const double MinColumnWidthEm = 2;
@@ -48,8 +53,8 @@ internal static class LatexTableLayout
     // Below one glyph per column the padding is dropped altogether.
     private const double LegibleColumnWidthEm = 1;
 
-    // Estimates ignore kerning and the narrower line inside a quote, callout or list
-    // item; the margin keeps a word that only just fits from being broken.
+    // Estimates ignore kerning, the italic type of block quotes and the letters a font
+    // draws wider than most; the margin keeps a word that only just fits from being broken.
     private const double WidthSafetyFactor = 1.08;
 
     // Shares are rounded down, which costs a column up to this much of its planned width.
@@ -60,7 +65,15 @@ internal static class LatexTableLayout
 
     private const double MonospaceWidthEm = 0.525;
     private const double BoldWidthFactor = 1.2;
+
+    // The renderer keeps characters up to Latin Extended-B and maps a few symbols beyond
+    // it to commands: arrows and dashes of at most 1em, and an ellipsis of three periods.
+    // In typewriter type the widest of them are three characters.
+    private const char LastLatinCharacter = (char)0x024F;
+    private const char Ellipsis = (char)0x2026;
     private const double SymbolWidthEm = 1;
+    private const double EllipsisWidthEm = 1.34;
+    private const double MonospaceSymbolWidthEm = 1.6;
 
     // Advance widths of '!'..'~' as the renderer escapes them, set in Latin Modern Roman
     // (T1), in thousandths of an em.
@@ -87,18 +100,21 @@ internal static class LatexTableLayout
     /// <summary>
     /// Sizes the columns of a table from estimated widths, in em of the body font: each
     /// column's widest cell set on one line, its widest word, and its widest content that
-    /// cannot be broken at all (a formula between two operators).
+    /// cannot be broken at all (a formula between two operators). The line width is the
+    /// one the table is expected to meet: the page, or what a quote or list leaves of it.
     /// </summary>
     public static LatexTablePlan Plan(
-        IReadOnlyList<double> naturalEm, IReadOnlyList<double> widestWordEm, IReadOnlyList<double> unbreakableEm)
+        IReadOnlyList<double> naturalEm, IReadOnlyList<double> widestWordEm, IReadOnlyList<double> unbreakableEm,
+        double lineWidthPt = PageLineWidthPt)
     {
         int count = naturalEm.Count;
-        var density = ChooseDensity(count);
+        lineWidthPt = Math.Max(lineWidthPt, EmPt);
+        var density = ChooseDensity(count, lineWidthPt);
         // Rules are only given up where they alone would use up the line.
-        bool hasRules = (count - 1) * RuleWidthPt < LineWidthPt / 2;
+        bool hasRules = (count - 1) * RuleWidthPt < lineWidthPt / 2;
         if (count == 0) return new LatexTablePlan(density, hasRules, [], []);
 
-        double budget = BudgetEm(count, density, hasRules);
+        double budget = BudgetEm(count, density, hasRules, lineWidthPt);
 
         // What a column asks for, most pressing first. Each array includes the one before.
         var rigid = new double[count];          // its widest formula part, which cannot break
@@ -145,6 +161,15 @@ internal static class LatexTableLayout
     }
 
     /// <summary>
+    /// The <c>\LTchunksize</c> for a large table, or null to keep the package default.
+    /// Column widths are fixed, so the chunk size changes memory use and nothing else.
+    /// </summary>
+    public static string? ChunkRows(int columnCount, int rowCount) =>
+        (long)columnCount * rowCount <= MaxChunkCells
+            ? null
+            : Math.Clamp(MaxChunkCells / columnCount, 1, MaxChunkRows).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// Whether text of the estimated width can be set on one line of a column.
     /// </summary>
     public static bool Fits(double estimatedEm, double columnEm) =>
@@ -161,10 +186,18 @@ internal static class LatexTableLayout
     /// </summary>
     public static double CharWidthEm(char ch, bool bold, bool monospace)
     {
-        if (ch > '\u024F') return SymbolWidthEm;    // mapped symbols such as arrows and dashes
-        if (monospace) return MonospaceWidthEm;
+        bool isAscii = ch is >= '!' and <= '~';
+        if (monospace)
+        {
+            // Symbols are mapped to commands that are not set in the typewriter font.
+            return ch > LastLatinCharacter ? MonospaceSymbolWidthEm
+                : isAscii || char.IsLetter(ch) ? MonospaceWidthEm
+                : 0.8;
+        }
 
-        double width = ch is >= '!' and <= '~' ? RomanWidths[ch - '!'] / 1000.0
+        double width = isAscii ? RomanWidths[ch - '!'] / 1000.0
+            : ch == Ellipsis ? EllipsisWidthEm
+            : ch > LastLatinCharacter ? SymbolWidthEm
             : char.IsLower(ch) ? 0.6                // accented lower-case letters
             : 0.8;                                  // accented capitals and Latin-1 symbols
         return bold ? width * BoldWidthFactor : width;
@@ -178,19 +211,21 @@ internal static class LatexTableLayout
 
     /// <summary>
     /// Rough width of an inline formula and of its widest part that TeX cannot break. TeX
-    /// breaks a formula only after a relation or binary operator outside braces. Stacked
-    /// constructs such as fractions are counted side by side, so they come out too wide.
+    /// breaks a formula only after a relation or binary operator, and not inside braces,
+    /// delimiters sized with \left and \right, or an environment. Stacked constructs such
+    /// as fractions are counted side by side, so they come out too wide.
     /// </summary>
     public static (double TotalEm, double UnbreakableEm) MathWidthEm(string tex)
     {
         double total = 0, part = 0, widestPart = 0;
         int depth = 0;
-        char previous = ' ';
+        // + and - are binary operators only after an operand: "(-1, -2)" offers no break.
+        bool afterOperand = false;
         for (int i = 0; i < tex.Length; i++)
         {
             char ch = tex[i];
             double glyphs = 0;
-            bool isOperator = false;
+            bool mayBreakAfter = false;
             if (ch == '\\')
             {
                 int start = i + 1;
@@ -199,8 +234,21 @@ internal static class LatexTableLayout
 
                 if (end == start)
                 {
-                    glyphs = 0.5;                   // control symbol such as \, or \{
+                    // Control symbol such as \, \{ or the \\ that ends a matrix row
+                    glyphs = 0.5;
+                    char symbol = start < tex.Length ? tex[start] : ' ';
+                    if (symbol is '{' or '\\') afterOperand = false;
+                    else if (symbol is '}' or '|') afterOperand = true;
                     i = start;
+                }
+                else if (tex.AsSpan(start, end - start) is "begin" or "end")
+                {
+                    // An environment such as pmatrix; its name is not printed
+                    bool begins = tex[start] == 'b';
+                    depth += begins ? 1 : -1;
+                    afterOperand = !begins;
+                    int close = end < tex.Length && tex[end] == '{' ? tex.IndexOf('}', end) : -1;
+                    i = close >= 0 ? close : end - 1;
                 }
                 else
                 {
@@ -208,33 +256,44 @@ internal static class LatexTableLayout
                     if (command == "left") depth++;
                     else if (command == "right") depth--;
 
-                    (glyphs, isOperator) = MathCommands.GetValueOrDefault(command, (MathSymbolGlyphs, false));
+                    (glyphs, bool isOperator) = MathCommands.GetValueOrDefault(command, (MathSymbolGlyphs, false));
+                    mayBreakAfter = isOperator && afterOperand;
+                    if (isOperator || command == "left") afterOperand = false;
+                    else if (glyphs > 0) afterOperand = true;
                     i = end - 1;
                 }
             }
-            else if (ch == '{')
+            else if (ch is '{' or '}')
             {
-                depth++;
+                depth += ch == '{' ? 1 : -1;
+                afterOperand = ch == '}';
             }
-            else if (ch == '}')
-            {
-                depth--;
-            }
-            else if (ch is '=' or '<' or '>' or '+' or '-')
+            else if (ch is '=' or '<' or '>')
             {
                 glyphs = MathOperatorGlyphs;
-                // Not a sign that opens the formula or a script such as x^-1.
-                isOperator = part > 0 && previous is not ('^' or '_');
+                mayBreakAfter = part > 0;
+                afterOperand = false;
             }
-            else if (!char.IsWhiteSpace(ch) && ch is not ('^' or '_' or '&'))
+            else if (ch is '+' or '-')
+            {
+                // A sign is set without the space around a binary operator
+                glyphs = afterOperand ? MathOperatorGlyphs : 1.4;
+                mayBreakAfter = afterOperand;
+                afterOperand = false;
+            }
+            else if (ch is '^' or '_' or '&')
+            {
+                afterOperand = false;
+            }
+            else if (!char.IsWhiteSpace(ch))
             {
                 glyphs = char.IsUpper(ch) ? 1.4 : 1;
+                afterOperand = ch is not ('(' or '[' or ',' or ';' or ':' or '*');
             }
 
-            if (!char.IsWhiteSpace(ch)) previous = ch;
             total += glyphs;
             part += glyphs;
-            if (isOperator && depth == 0)
+            if (mayBreakAfter && depth == 0)
             {
                 widestPart = Math.Max(widestPart, part);
                 part = 0;
@@ -279,12 +338,12 @@ internal static class LatexTableLayout
         }
     }
 
-    private static LatexTableDensity ChooseDensity(int columnCount)
+    private static LatexTableDensity ChooseDensity(int columnCount, double lineWidthPt)
     {
-        if (BudgetEm(columnCount, LatexTableDensity.Normal, hasRules: true) >= columnCount * ComfortableColumnWidthEm)
+        if (BudgetEm(columnCount, LatexTableDensity.Normal, true, lineWidthPt) >= columnCount * ComfortableColumnWidthEm)
             return LatexTableDensity.Normal;
 
-        if (BudgetEm(columnCount, LatexTableDensity.Compact, hasRules: true) >= columnCount * LegibleColumnWidthEm)
+        if (BudgetEm(columnCount, LatexTableDensity.Compact, true, lineWidthPt) >= columnCount * LegibleColumnWidthEm)
             return LatexTableDensity.Compact;
 
         return LatexTableDensity.Bare;
@@ -301,11 +360,11 @@ internal static class LatexTableLayout
     };
 
     // The width left for cell contents once padding and column rules are paid for.
-    private static double BudgetEm(int columnCount, LatexTableDensity density, bool hasRules)
+    private static double BudgetEm(int columnCount, LatexTableDensity density, bool hasRules, double lineWidthPt)
     {
         double padding = PaddingPt(density) ?? DefaultPaddingPt;
         double rules = hasRules ? (columnCount - 1) * RuleWidthPt : 0;
-        return (LineWidthPt - 2 * columnCount * padding - rules) / EmPt;
+        return (lineWidthPt - 2 * columnCount * padding - rules) / EmPt;
     }
 
     // Raises one common level until the columns, each held between its lower and upper

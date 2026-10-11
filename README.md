@@ -553,7 +553,7 @@ Every column is a `p{...}` column. Its width is a share of what the line has lef
 \begin{longtable}{>{\raggedleft\arraybackslash\hspace{0pt}}p{0.0526\dimexpr\linewidth-6\tabcolsep-2\arrayrulewidth\relax} | ...}
 ```
 
-The shares of a table add up to slightly less than one, so its columns, padding and rules together are never wider than `\linewidth` — on the page and inside a block quote, callout or list item. TeX evaluates the budget itself.
+The shares of a table add up to slightly less than one, so its columns, padding and rules together are never wider than `\linewidth`. TeX evaluates the budget itself, and a table inside a block quote, callout or list item is sized for the narrower line it gets there.
 
 #### Column sizing
 
@@ -573,20 +573,24 @@ Only text that cannot fit its column on one line is touched, and only by adding 
 
 | Content | Handling |
 |---------|----------|
-| URLs, paths, qualified names, `snake_case`, `camelCase` | May break after a separator and before a camelCase capital (`\allowbreak`) |
+| URLs, paths, qualified names, `snake_case`, `camelCase` | May break after a separator and before a camelCase capital (`\allowbreak`), also where the token runs through bold, italic or code |
 | Hashes, long numbers, code without separators | May break between characters (`\allowbreak`) |
 | A word wider than its column | May break with a hyphen (`\-`) |
-| Inline math, citations, link targets | Emitted unchanged. TeX breaks a formula only after a relation or operator, so its column is kept at least as wide as the widest part in between. |
+| Inline math, citations, link targets | Emitted unchanged. TeX breaks a formula only after a relation or binary operator, so its column is kept at least as wide as the widest part in between. Text glued to a formula may break beside it. |
 
 No character of a cell is dropped, truncated or reordered, and text outside tables is left as it was.
 
-#### Many columns
+#### Many columns, many rows
 
-| Columns | Cell padding (`\tabcolsep`) |
+| Columns on the page | Cell padding (`\tabcolsep`) |
 |--------:|-----------------------------|
 | up to 10 | Document default (6pt) |
 | 11 to 26 | 3pt, set for that table only |
 | 27 or more | None |
+
+Inside a quote, callout or list the line is narrower and the padding is tightened sooner.
+
+A table of more than 400 cells also sets `\LTchunksize` for itself, so that `longtable` typesets it about 400 cells (at most 20 rows) at a time. The column widths are fixed, so this changes how much memory TeX needs and nothing about the layout.
 
 #### Limits
 
@@ -594,6 +598,8 @@ No character of a cell is dropped, truncated or reordered, and text outside tabl
 - A formula without a break point that is wider than the room the table can give it overflows its cell, which `pdflatex` logs as `Overfull \hbox`. A formula is never given so much room that the other columns average less than 3em.
 - A too-wide word is broken where the column ends, not by the hyphenation rules of its language.
 - A single row that is taller than the page is not split across pages.
+- A table inside a block quote or callout is not split across pages either, because the box around it cannot break. One that would be taller than about 19 pages stops `pdflatex` with `Dimension too large`.
+- TeX itself stops at 256 columns.
 
 ## Extending: Adding a New Export Format
 
