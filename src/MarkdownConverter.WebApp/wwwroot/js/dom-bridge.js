@@ -162,7 +162,13 @@ window.domBridge = {
             var before = el.value;
             if (canUsePasteStyleEdit(before, start, end)) {
                 var expected = before.substring(0, start) + text + before.substring(end);
-                var accepted = document.execCommand('insertHTML', false, escapeHtml(text));
+                var accepted = false;
+                try {
+                    accepted = document.execCommand('insertHTML', false, escapeHtml(text));
+                } catch (rejected) {
+                    // Some engines and content policies refuse the command by
+                    // throwing instead of returning false.
+                }
                 if (accepted && el.value === expected) {
                     el.selectionStart = el.selectionEnd = start + text.length;
                     return;

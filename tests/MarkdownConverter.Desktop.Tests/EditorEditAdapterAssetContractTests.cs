@@ -45,7 +45,12 @@ public class EditorEditAdapterAssetContractTests
     {
         var adapter = ReadInsertTextAtCursor();
 
-        Assert.Contains("var accepted = document.execCommand('insertHTML', false, escapeHtml(text));", adapter);
+        Assert.Contains("accepted = document.execCommand('insertHTML', false, escapeHtml(text));", adapter);
+        // An engine or content policy may refuse the command by throwing;
+        // that must lead to the fallback, not to a failed edit.
+        Assert.Matches(
+            new Regex(@"try \{\s*accepted = document\.execCommand\('insertHTML'[^;]*;\s*\} catch \(rejected\) \{"),
+            adapter);
         // The command must report success AND the result must equal the
         // expected text exactly; otherwise the edit is reverted and plain
         // insertText is used. The value alone is not enough: replacing text
