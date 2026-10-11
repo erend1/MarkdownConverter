@@ -596,7 +596,7 @@ A table of more than 400 cells or 20,000 characters also sets `\LTchunksize` for
 
 - An A4 page at 11pt holds about ten columns comfortably. With more than 16 columns the average column is narrower than 2em and words are broken into short pieces; from about 40 columns a column is narrower than one wide letter. Such tables stay inside the margins but are hard to read — split them.
 - A formula without a break point that is wider than the room the table can give it overflows its cell, which `pdflatex` logs as `Overfull \hbox`. A formula is never given so much room that the other columns average less than 3em.
-- The printed form of a citation is decided by the bibliography style when the document is compiled, after the table is planned. Its column is sized for an author–year reference such as "Smith, 2023".
+- The printed form of a citation is decided by the bibliography style when the document is compiled, after the table is planned. Its column is sized for an author–year reference such as "Smith, 2023". TeX breaks a citation only at its spaces, so in a column narrower than one of its words, or where two citations stand together without a space, it overflows its cell.
 - A too-wide word is broken where the column ends, not by the hyphenation rules of its language.
 - A single row that is taller than the page is not split across pages. One row of more than about 30,000 characters in narrow columns stops `pdflatex` with `TeX capacity exceeded`, because a row is the least TeX can typeset at a time.
 - A table inside a block quote or callout is not split across pages either, because the box around it cannot break. One that would be taller than about 19 pages stops `pdflatex` with `Dimension too large`.
