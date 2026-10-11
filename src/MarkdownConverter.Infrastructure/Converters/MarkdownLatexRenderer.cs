@@ -725,14 +725,14 @@ internal static class MarkdownLatexRenderer
 
     private static bool OpensItem(CellUnit unit) => !unit.IsBox && unit.Char is ',' or ';' or '=' or '(' or '[';
 
-    // A sign, bracket, quote or sigil that starts something, or the point of ".5" and
-    // ".NET". "=>" and "==" stay together.
+    // A sign, bracket, quote or sigil that starts something, not punctuation that closes or
+    // separates. A point starts ".5" and ".NET" only; "=>" and "==" stay together.
     private static bool LeadsItem(List<CellUnit> token, int index)
     {
         var unit = token[index];
-        if (unit.IsBox) return false;
+        if (unit.IsBox || char.IsLetterOrDigit(unit.Char)) return false;
         if (unit.Char == '.') return index + 1 < token.Count && char.IsLetterOrDigit(token[index + 1].Char);
-        return unit.Char is '-' or '+' or '(' or '[' or '{' or '"' or '\'' or '`' or '$' or '#' or '@' or '~' or '\\' or '/';
+        return unit.Char is not (')' or ']' or '}' or ':' or '!' or '?' or ',' or ';' or '=' or '>');
     }
 
     private static bool MayBreakBefore(List<CellUnit> token, int index, bool wordBeforePrevious)

@@ -439,6 +439,9 @@ public class MarkdownLatexRendererTableTests
         "(.125,.250,.375,.500,.625,.750,.875,.999,.111,.222,.333,.444)",
         @"(.125,\allowbreak{}.250,\allowbreak{}.375,\allowbreak{}.500,\allowbreak{}.625,\allowbreak{}.750,\allowbreak{}.875,\allowbreak{}.999,\allowbreak{}.111,\allowbreak{}.222,\allowbreak{}.333,\allowbreak{}.444)")]
     [InlineData(
+        "`call(_first,_second,*third,&fourth,<fifth>,%sixth,^seventh,_eighth)`",
+        @"\texttt{call(\allowbreak{}\_first,\allowbreak{}\_second,\allowbreak{}*third,\allowbreak{}\&fourth,\allowbreak{}<fifth>,\allowbreak{}\%sixth,\allowbreak{}\textasciicircum{}seventh,\allowbreak{}\_eighth)}")]
+    [InlineData(
         "name=.gitignore;path=.github/workflows;framework=.NET;ratio=.75",
         @"name=\allowbreak{}.gitignore;\allowbreak{}path=\allowbreak{}.github/\allowbreak{}workflows;\allowbreak{}framework=\allowbreak{}.NET;\allowbreak{}ratio=\allowbreak{}.75")]
     [InlineData(
@@ -446,8 +449,8 @@ public class MarkdownLatexRendererTableTests
         @"alpha=>\allowbreak{}beta;\allowbreak{}gamma=>\allowbreak{}delta;\allowbreak{}epsilon=>\allowbreak{}zeta;\allowbreak{}eta=>\allowbreak{}theta;\allowbreak{}iota=>\allowbreak{}kappa;\allowbreak{}lambda=>\allowbreak{}mu")]
     public void Table_BreakAfterASeparator_KeepsWhatFollowsWhole(string token, string expected)
     {
-        // A break after the comma, semicolon or equals sign: not between a sign or a leading
-        // point and what it belongs to, and not inside "=>".
+        // A break after the comma, semicolon, equals sign or opening bracket: not between a
+        // sign, sigil or leading point and what it belongs to, and not inside "=>".
         var cell = LatexTableSource.Single(MarkdownLatexRenderer.Render(NarrowColumnTable(token))).Rows[1][1];
 
         Assert.Equal(expected, cell);
