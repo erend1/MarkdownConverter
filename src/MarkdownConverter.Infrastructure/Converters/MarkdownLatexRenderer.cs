@@ -790,15 +790,26 @@ internal static class MarkdownLatexRenderer
         int first = keepEnds ? 2 : 1;
         int last = count - (keepEnds ? 3 : 1);
 
-        for (int i = first; i <= last; i++)
+        // A line that ends inside a word ends with a hyphen, which needs room as well
+        double hyphenEm = isWord ? LatexTableLayout.CharWidthEm('-', bold: true, monospace: false) : 0;
+        double sinceMarkEm = token[start].WidthEm;
+        for (int i = 1; i < count; i++)
         {
+            // A mark where the pattern has one, and where the characters since the last
+            // mark would outgrow the column: wide letters do not go by the average
+            var unit = token[start + i];
+            bool regular = i >= first && i <= last && i % step == 0;
+            double lineEndEm = i < count - 1 ? hyphenEm : 0;
+            bool needed = !LatexTableLayout.Fits(sinceMarkEm + unit.WidthEm + lineEndEm, columnEm);
+
             // A formula breaks only where TeX allows it and keeps the character on either
             // side of it; the rest of the punctuation around it may break
-            var unit = token[start + i];
-            if (i % step == 0 && !unit.IsBox && !token[start + i - 1].IsBox && !SplitsLigature(token, start + i))
+            if ((regular || needed) && !unit.IsBox && !token[start + i - 1].IsBox && !SplitsLigature(token, start + i))
             {
                 breaks.Add(unit.Source!, unit.Index, mark);
+                sinceMarkEm = 0;
             }
+            sinceMarkEm += unit.WidthEm;
         }
     }
 

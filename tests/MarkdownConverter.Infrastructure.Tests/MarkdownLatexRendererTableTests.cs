@@ -544,6 +544,37 @@ public class MarkdownLatexRendererTableTests
         Assert.Equal(word, LatexTableSource.WithoutBreaks(cell));
     }
 
+    [Theory]
+    [InlineData("MWilliamson")]         // wide letters first
+    [InlineData("illinoiswww")]         // wide letters last
+    [InlineData("Wilhelmshaven")]
+    public void Table_PieceOfWideLetters_IsNeverWiderThanItsColumn(string word)
+    {
+        // Fifteen columns of the same word get 2.2em each. That holds three letters of
+        // average width, so two are kept before a break and three after it, but "MW" and
+        // a hyphen need 2.7em in bold.
+        var row = "|" + string.Concat(Enumerable.Repeat($" {word} |", 15));
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 15));
+        var table = LatexTableSource.Single(MarkdownLatexRenderer.Render($"{row}\n{divider}\n{row}\n"));
+        double columnEm = table.ColumnWidthsSp(LatexTableSource.DocumentLineWidthSp)[0] / (10.95 * LatexTableSource.PointSp);
+
+        AssertPiecesFit(table.Rows[0][0][@"\textbf{".Length..^1], bold: true);
+        AssertPiecesFit(table.Rows[1][0], bold: false);
+
+        void AssertPiecesFit(string cell, bool bold)
+        {
+            var pieces = cell.Split(@"\-");
+            Assert.Equal(word, string.Concat(pieces));
+            for (int i = 0; i < pieces.Length; i++)
+            {
+                // A line that ends inside the word ends with a hyphen
+                var line = i < pieces.Length - 1 ? pieces[i] + "-" : pieces[i];
+                double lineEm = line.Sum(ch => LatexTableLayout.CharWidthEm(ch, bold, monospace: false));
+                Assert.True(lineEm <= columnEm, FormattableString.Invariant($"'{line}' needs {lineEm:F2}em of {columnEm:F2}em"));
+            }
+        }
+    }
+
     [Fact]
     public void Table_Math_IsEmittedUnchanged()
     {

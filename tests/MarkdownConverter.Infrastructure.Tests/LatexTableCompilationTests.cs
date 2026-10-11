@@ -322,6 +322,25 @@ public partial class LatexTableCompilationTests : IClassFixture<LatexCompilation
     }
 
     [LatexFact(LatexToolchain.PdfLatex)]
+    public async Task DenseTableOfWideLetters_KeepsEveryPieceInsideItsCell()
+    {
+        // Fifteen columns of 2.2em hold three letters of average width, but not "MW-",
+        // "WWW" or "==|" in bold.
+        string[] words = ["MWilliamson", "illinoisWWW", "Wilhelmshaven", "Result==MAX", "mmmWWWmmm"];
+        var divider = "|" + string.Concat(Enumerable.Repeat("---|", 15));
+        var rows = Enumerable.Range(0, 6).Select(row =>
+            "|" + string.Concat(Enumerable.Range(0, 15).Select(column => $" {words[(row + column) % words.Length]} |")));
+        var markdown = string.Join("\n", rows.Take(1).Append(divider).Concat(rows.Skip(1))) + "\n";
+
+        var document = await _latex.CompileAsync("dense-wide-letters", MarkdownLatexRenderer.Render(markdown));
+
+        AssertCompiled(document);
+        Assert.True(
+            document.OverfullBoxes.Count == 0,
+            string.Join("; ", document.OverfullBoxes.Select(box => Invariant($"{box.Points}pt {box.Place}"))));
+    }
+
+    [LatexFact(LatexToolchain.PdfLatex)]
     public async Task LargeDenseTable_FitsTexMemory()
     {
         // 8,000 cells whose numbers have to break. Typeset 200 rows at a time, as longtable
