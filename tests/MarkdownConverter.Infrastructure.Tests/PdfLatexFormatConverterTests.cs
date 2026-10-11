@@ -125,6 +125,46 @@ public class PdfLatexFormatConverterTests
         Assert.Equal(4, result.BytesWritten);
     }
 
+    [Theory]
+    [InlineData("asymmetric-3col")]
+    [InlineData("wide-6col")]
+    [InlineData("dense-13col")]
+    public async Task ConvertAsync_Table_CompilesTheSameSourceTheLatexExportWrites(string fixture)
+    {
+        var md = LatexTableFixtures.Read(fixture);
+        string? compiledSource = null;
+        _fsMock.Setup(f => f.WriteAllTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, content, _) => compiledSource = content)
+            .Returns(Task.CompletedTask);
+        _procMock.Setup(p => p.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessRunResult { ExitCode = 0, StandardOutput = "", StandardError = "" });
+        _fsMock.Setup(f => f.FileExists(It.IsAny<string>())).Returns(true);
+        _fsMock.Setup(f => f.ReadAllBytesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new byte[] { 1 });
+        _fsMock.Setup(f => f.WriteAllBytesAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        string? exportedSource = null;
+        var latexFs = new Mock<IFileSystem>();
+        latexFs.Setup(f => f.WriteAllTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, content, _) => exportedSource = content)
+            .Returns(Task.CompletedTask);
+
+        var outputDirectory = Path.GetTempPath();
+        await _sut.ConvertAsync(MakeRequest(md, Path.Combine(outputDirectory, "table.pdf")));
+        await new LatexFormatConverter(latexFs.Object).ConvertAsync(new ConversionRequest
+        {
+            Document = new MarkdownDocument { RawMarkdown = md, ParsedAst = new object() },
+            TargetFormat = ExportFormat.Latex,
+            OutputFilePath = Path.Combine(outputDirectory, "table.tex")
+        });
+
+        Assert.NotNull(compiledSource);
+        Assert.Equal(exportedSource, compiledSource);
+        var table = LatexTableSource.Single(compiledSource);
+        Assert.True(table.TotalWidthSp(LatexTableSource.DocumentLineWidthSp) <= LatexTableSource.DocumentLineWidthSp);
+    }
+
     private static ConversionRequest MakeRequest(string md, string outputPath) =>
         new()
         {

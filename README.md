@@ -77,6 +77,7 @@ MarkdownConverter/
 │   │   │   ├── PdfLatexFormatConverter.cs          # Markdown → LaTeX → pdflatex → PDF
 │   │   │   ├── LatexFormatConverter.cs             # Markdown → LaTeX file
 │   │   │   ├── MarkdownLatexRenderer.cs            # Shared Markdown-to-LaTeX renderer
+│   │   │   ├── LatexTableLayout.cs                 # Width-safe, content-aware table columns
 │   │   │   └── LatexMathConverter.cs               # LaTeX math → OMML (Word formulas)
 │   │   ├── Bibliography/
 │   │   │   ├── BibTexParser.cs                    # BibTeX file parser
@@ -425,6 +426,7 @@ Presenters hold ViewModels, receive user gestures from Views, orchestrate servic
 - Full LaTeX math support via `amsmath`
 - APA-style citations via `biblatex` + `biber`
 - Code blocks with `listings` package (background, frames, line numbers, language-aware)
+- **Tables** as `longtable`s that stay inside the page margins, size their columns from the content and continue across pages (see [Tables in LaTeX and PDF](#tables-in-latex-and-pdf))
 - **Blockquotes** via `tcolorbox` `mdquote` environment with grey left bar, italic text
 - **Callouts** via colored `tcolorbox` environments with FontAwesome icons (`\faInfoCircle`, `\faExclamationTriangle`, etc.)
 - **Attribution** rendered as `\hfill\textit{--- Author}` right-aligned
@@ -437,6 +439,7 @@ Presenters hold ViewModels, receive user gestures from Views, orchestrate servic
 - Inline math preserved as `$...$`, display math as `\[...\]`
 - Special characters properly escaped (`&`, `%`, `#`, `_`, `{`, `}`, `~`, `^`)
 - Unicode emoji/symbols mapped to LaTeX equivalents (unsupported chars gracefully dropped)
+- Tables need only `longtable` and `array`; their widths are computed by TeX from `\linewidth`, so they still fit after the page geometry of the `.tex` file is changed
 
 ### Math Rendering
 
@@ -537,6 +540,67 @@ The `--- Author` or `— Author` line in the last paragraph is detected and rend
 | `[!IMPORTANT]` | Violet `tcolorbox` with `\faExclamation` | Violet-bordered table, `E8D5FF` background |
 | `[!WARNING]` | Yellow `tcolorbox` with `\faExclamationTriangle` | Yellow-bordered table, `FFF4CC` background |
 | `[!CAUTION]` | Red `tcolorbox` with `\faBan` | Red-bordered table, `FDDEDE` background |
+
+### Tables in LaTeX and PDF
+
+Tables are written as `longtable` environments that span the text width and continue on the following pages. The LaTeX and PDF exports share the same source, and no package beyond `longtable` and `array` is involved.
+
+#### Width
+
+Every column is a `p{...}` column. Its width is a share of what the line has left once the padding of every cell and the rules between the columns are paid for:
+
+```latex
+\begin{longtable}{>{\raggedleft\arraybackslash\hspace{0pt}}p{0.0526\dimexpr\linewidth-6\tabcolsep-2\arrayrulewidth\relax} | ...}
+```
+
+The shares of a table add up to slightly less than one, so its columns, padding and rules together are never wider than `\linewidth`. TeX evaluates the budget itself, and a table inside a block quote, callout or list item is sized for the narrower line it gets there.
+
+#### Column sizing
+
+Column widths follow the cell contents, estimated from the metrics of the document fonts. The same input always produces the same widths.
+
+| The table… | Result |
+|------------|--------|
+| has room to spare | Every cell stays on one line. The narrowest columns are widened to a common width, so a table of short cells keeps equal columns. |
+| has to wrap | Short columns (IDs, numbers, labels) keep their text on one line. The columns with the most text share the rest equally and wrap. |
+| is dense | Narrow columns give up the minimum width first; after that the longest words are broken. |
+
+While the table has room, no column is narrower than 2em or than its longest word (up to 12em; longer tokens wrap). Column alignment (`:--`, `:-:`, `--:`), bold headers, inline formatting and row order are unchanged.
+
+#### Content that cannot wrap by itself
+
+Only text that cannot fit its column on one line is touched, and only by adding places where TeX may break it:
+
+| Content | Handling |
+|---------|----------|
+| URLs, paths, qualified names, `snake_case`, `camelCase` | May break after a separator and before a camelCase capital (`\allowbreak`), also where the token runs through bold, italic or code |
+| Hashes, long numbers, code without separators | May break between characters (`\allowbreak`) |
+| A word wider than its column | May break with a hyphen (`\-`) |
+| Inline math, citations, link targets | Emitted unchanged. TeX breaks a formula only after a relation or binary operator, so its column is kept at least as wide as the widest part in between. Text glued to a formula may break beside it. |
+
+No character of a cell is dropped, truncated or reordered, and text outside tables is left as it was.
+
+#### Many columns, many rows
+
+| Columns on the page | Cell padding (`\tabcolsep`) |
+|--------:|-----------------------------|
+| up to 10 | Document default (6pt) |
+| 11 to 26 | 3pt, set for that table only |
+| 27 or more | None |
+
+Inside a quote, callout or list the line is narrower and the padding is tightened sooner.
+
+A table of more than 400 cells or 20,000 characters also sets `\LTchunksize` for itself, so that `longtable` typesets it at most that much (and at most 20 rows) at a time, counted where its rows are longest. The column widths are fixed, so this changes how much memory TeX needs and nothing about the layout.
+
+#### Limits
+
+- An A4 page at 11pt holds about ten columns comfortably. With more than 16 columns the average column is narrower than 2em and words are broken into short pieces; from about 40 columns a column is narrower than one wide letter. Such tables stay inside the margins but are hard to read — split them.
+- A formula without a break point that is wider than the room the table can give it overflows its cell, which `pdflatex` logs as `Overfull \hbox`. A formula is never given so much room that the other columns average less than 3em.
+- The printed form of a citation is decided by the bibliography style when the document is compiled, after the table is planned. Its column is sized for an author–year reference such as "Smith, 2023". TeX breaks a citation only at its spaces, so in a column narrower than one of its words, or where two citations stand together without a space, it overflows its cell.
+- A too-wide word is broken where the column ends, not by the hyphenation rules of its language.
+- A single row that is taller than the page is not split across pages. One row of more than about 30,000 characters in narrow columns stops `pdflatex` with `TeX capacity exceeded`, because a row is the least TeX can typeset at a time.
+- A table inside a block quote or callout is not split across pages either, because the box around it cannot break. One that would be taller than about 19 pages stops `pdflatex` with `Dimension too large`.
+- TeX itself stops at 256 columns.
 
 ## Extending: Adding a New Export Format
 
